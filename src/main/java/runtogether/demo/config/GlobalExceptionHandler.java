@@ -23,6 +23,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleAllException(Exception e) {
         // 500 Internal Server Error (서버 잘못)
+        e.printStackTrace();
         return ResponseEntity.internalServerError()
                 .body(Collections.singletonMap("message", "서버에 알 수 없는 오류가 발생했습니다."));
     }

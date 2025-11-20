@@ -11,13 +11,18 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@RequiredArgsConstructor // ★ 추가: JwtFilter 주입을 위해 필요
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtFilter jwtFilter; // ★ 추가: 우리가 만든 검표원
+    private final JwtFilter jwtFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -28,16 +33,32 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                // ★ 추가: 세션을 쓰지 않겠다 (JWT를 쓰니까!)
+                // 여기서 호출하는 메서드가 아래에 정의되어 있어야 합니다!
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/v1/auth/**").permitAll() // 회원가입, 로그인은 누구나
-                        .anyRequest().authenticated() // 나머지는 무조건 인증 필요!
+                        // ★ 회원가입, 로그인만 허용 (프로필 설정은 검사!)
+                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                        .anyRequest().authenticated()
                 )
-                // ★ 핵심: 우리가 만든 JwtFilter를 원래 검표원(UsernamePassword...) 앞에 세움
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    // ★ 아까 빠졌던 CORS 설정 메서드 (이게 꼭 있어야 합니다!)
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        configuration.setAllowedOriginPatterns(List.of("*"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+        configuration.addExposedHeader("Authorization");
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

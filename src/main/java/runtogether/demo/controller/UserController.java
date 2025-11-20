@@ -27,12 +27,14 @@ public class UserController {
         return ResponseEntity.ok(Collections.singletonMap("message", message));
     }
 
+    // 2. 프로필 설정
     @PostMapping("/profile")
     public ResponseEntity<?> setupProfile(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @AuthenticationPrincipal String email, // ★ 수정: UserDetails -> String
             @RequestBody ProfileDto requestDto) {
 
-        userService.setupProfile(userDetails.getUsername(), requestDto);
+        // ★ 수정: userDetails.getUsername() -> email 로 변경
+        userService.setupProfile(email, requestDto);
         return ResponseEntity.ok(Collections.singletonMap("message", "프로필 설정 완료!"));
     }
 
