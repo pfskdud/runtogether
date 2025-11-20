@@ -1,34 +1,51 @@
-package runtogether.demo.domain; // 1번에서 만든 패키지 이름
+package runtogether.demo.domain;
 
-import jakarta.persistence.*; // javax.persistence가 아닌 jakarta.persistence 입니다!
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import java.time.LocalDate;
 
-@Entity // "이건 테이블 설계도입니다!" 라고 JPA에게 알림
-@Table(name = "users") // 테이블 이름을 'users'로 지정
-@Getter // (Lombok) .getName() 같은 메소드 자동 생성
-@NoArgsConstructor // (Lombok) 기본 생성자 자동 생성
+@Entity
+@Getter
+@NoArgsConstructor
+@Table(name = "users")
 public class User {
 
-    @Id // 이건 Primary Key (식별자) 입니다.
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // DB가 알아서 1, 2, 3... 번호 부여
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
     private Long id;
 
-    @Column(nullable = false, unique = true) // null 안됨, 중복 안됨
+    @Column(nullable = false, unique = true)
     private String email;
 
     @Column(nullable = false)
-    private String password; // 암호화해서 저장할 예정
+    private String password;
 
-    @Column(nullable = false, unique = true) // null 안됨, 중복 안됨
+    // ★ 수정: 1단계에서는 닉네임이 없으므로 nullable = false 제거!
+    @Column(unique = true)
     private String nickname;
 
-    // 서비스(Service)에서 DTO와 암호화된 비밀번호를 받아
-    // User 객체를 쉽게 만들기 위한 생성자
-    public User(String email, String password, String nickname) {
+    // ★ 추가: 성별 (DB에는 문자열 "MALE", "FEMALE"로 저장됨)
+    @Enumerated(EnumType.STRING)
+    private Gender gender;
+
+    // ★ 추가: 생년월일
+    private LocalDate birthDate;
+
+    // ★ 추가: 프로필 이미지 URL
+    private String profileImageUrl;
+
+    // [1단계용 생성자] 이메일과 비밀번호만으로 계정 생성
+    public User(String email, String password) {
         this.email = email;
         this.password = password;
+    }
+
+    // [2단계용 메서드] 나중에 프로필 정보를 업데이트할 때 사용
+    public void updateProfile(String nickname, Gender gender, LocalDate birthDate, String profileImageUrl) {
         this.nickname = nickname;
+        this.gender = gender;
+        this.birthDate = birthDate;
+        this.profileImageUrl = profileImageUrl;
     }
 }
