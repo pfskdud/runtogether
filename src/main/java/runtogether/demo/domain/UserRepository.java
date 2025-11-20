@@ -9,4 +9,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // 우리는 닉네임 중복 검사용으로 이것 하나만 추가합니다.
     Optional<User> findByNickname(String nickname);
+    Optional<User> findByEmail(String email);
 }
