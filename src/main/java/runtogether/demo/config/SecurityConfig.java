@@ -1,39 +1,42 @@
 package runtogether.demo.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-@Configuration // "이건 설정 파일입니다"
-@EnableWebSecurity // "Spring Security를 활성화합니다"
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor // ★ 추가: JwtFilter 주입을 위해 필요
 public class SecurityConfig {
 
-    // 1. 비밀번호 암호화 기계(PasswordEncoder)를 Bean으로 등록
+    private final JwtFilter jwtFilter; // ★ 추가: 우리가 만든 검표원
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // 2. 보안 규칙 설정
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // (1) CSRF 보호 비활성화 (API 서버는 보통 비활성화합니다)
                 .csrf(AbstractHttpConfigurer::disable)
+                // ★ 추가: 세션을 쓰지 않겠다 (JWT를 쓰니까!)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // (2) HTTP 요청에 대한 접근 권한 설정
                 .authorizeHttpRequests(authorize -> authorize
-                        // "/api/v1/auth/**" 경로의 모든 요청은...
-                        .requestMatchers("/api/v1/auth/**").permitAll() // ...누구나 접근(permit) 허용!
-
-                        // 그 외의 모든 요청은...
-                        .anyRequest().authenticated() // ...인증된(로그인한) 사용자만 접근 허용!
-                );
+                        .requestMatchers("/api/v1/auth/**").permitAll() // 회원가입, 로그인은 누구나
+                        .anyRequest().authenticated() // 나머지는 무조건 인증 필요!
+                )
+                // ★ 핵심: 우리가 만든 JwtFilter를 원래 검표원(UsernamePassword...) 앞에 세움
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

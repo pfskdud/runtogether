@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import runtogether.demo.dto.UserRequestDto;
 import runtogether.demo.service.UserService;
+import runtogether.demo.dto.LoginRequestDto;
+import runtogether.demo.dto.TokenResponseDto;
 
 @RestController // "이건 JSON 데이터를 주고받는 API 컨트롤러입니다"
 @RequiredArgsConstructor
@@ -25,5 +27,13 @@ public class UserController {
 
         // 2. 결과 메시지를 200 OK 상태코드와 함께 반환
         return ResponseEntity.ok(message);
+    }
+
+    // ★ 로그인 API 추가
+    // POST http://localhost:8080/api/v1/auth/login
+    @PostMapping("/login")
+    public ResponseEntity<TokenResponseDto> login(@RequestBody LoginRequestDto requestDto) {
+        String token = userService.login(requestDto);
+        return ResponseEntity.ok(new TokenResponseDto(token));
     }
 }
