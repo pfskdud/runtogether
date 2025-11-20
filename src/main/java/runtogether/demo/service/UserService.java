@@ -46,12 +46,18 @@ public class UserService {
             throw new IllegalArgumentException("이미 사용 중인 닉네임입니다.");
         }
 
+        // 프론트에서 보낸 이미지가 없거나(null) 비어있으면("") -> "default.png"로 설정
+        String finalImageUrl = requestDto.getProfileImageUrl();
+        if (finalImageUrl == null || finalImageUrl.trim().isEmpty()) {
+            finalImageUrl = "default.png"; // 기본 이미지 이름
+        }
+
         // 정보 업데이트 (User 엔티티에 만든 메서드 사용)
         user.updateProfile(
                 requestDto.getNickname(),
                 requestDto.getGender(),
                 requestDto.getBirthDate(),
-                requestDto.getProfileImageUrl()
+                finalImageUrl // 처리된 이미지 주소 저장
         );
         // @Transactional 덕분에 user.updateProfile만 해도 DB에 자동 저장됨 (Dirty Checking)
     }

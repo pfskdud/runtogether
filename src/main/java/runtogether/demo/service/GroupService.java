@@ -6,6 +6,9 @@ import org.springframework.transaction.annotation.Transactional;
 import runtogether.demo.domain.*;
 import runtogether.demo.dto.GroupDto;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 public class GroupService {
@@ -15,7 +18,7 @@ public class GroupService {
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
 
-    // ★ 이 메서드가 정확히 있어야 합니다!
+    // 1. 그룹 생성
     @Transactional
     public Long createGroup(String email, GroupDto.CreateRequest request) {
         User user = userRepository.findByEmail(email)
@@ -34,7 +37,7 @@ public class GroupService {
         return savedGroup.getId();
     }
 
-    // 코스 추가
+    // 2. 코스 추가
     @Transactional
     public void addCourse(Long groupId, GroupDto.AddCourseRequest request) {
         RunningGroup group = groupRepository.findById(groupId)
@@ -49,7 +52,7 @@ public class GroupService {
         courseRepository.save(course);
     }
 
-    // 그룹 참여
+    // 3. 그룹 참여
     @Transactional
     public String joinGroup(String email, Long groupId) {
         User user = userRepository.findByEmail(email)
@@ -63,5 +66,19 @@ public class GroupService {
 
         userGroupRepository.save(new UserGroup(user, group));
         return "그룹 가입 완료!";
+    }
+
+    // ★ [추가됨] 4. 전체 그룹 목록 조회 (이것도 있어야 컨트롤러가 에러 안 남!)
+    @Transactional(readOnly = true)
+    public List<GroupDto.Response> getAllGroups() {
+        return groupRepository.findAll().stream()
+                .map(group -> new GroupDto.Response(
+                        group.getId(),
+                        group.getName(),
+                        group.getStartDate().toString(),
+                        group.getEndDate().toString(),
+                        group.getOwner().getNickname()
+                ))
+                .collect(Collectors.toList());
     }
 }
