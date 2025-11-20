@@ -6,34 +6,49 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import runtogether.demo.dto.UserRequestDto;
-import runtogether.demo.service.UserService;
 import runtogether.demo.dto.LoginRequestDto;
 import runtogether.demo.dto.TokenResponseDto;
+import runtogether.demo.dto.UserRequestDto;
+import runtogether.demo.service.UserService;
 
-@RestController // "이건 JSON 데이터를 주고받는 API 컨트롤러입니다"
+import java.util.Collections; // ★ 추가: Map을 쉽게 만들기 위해 필요
+
+@RestController
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/auth") // 이 컨트롤러의 기본 주소는 "localhost:8080/api/v1/auth" 입니다.
 public class UserController {
 
     private final UserService userService;
 
-    // 회원가입 API
-    // 주소: POST http://localhost:8080/api/v1/auth/register
+    // 1. 회원가입 API
     @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody UserRequestDto requestDto) {
-        // 1. 서비스에게 회원가입 처리를 맡김
-        String message = userService.registerUser(requestDto);
+    public ResponseEntity<?> register(@RequestBody UserRequestDto requestDto) {
+        try {
+            // 성공 시: 그냥 문자열 메시지 반환 (200 OK)
+            String message = userService.registerUser(requestDto);
+            return ResponseEntity.ok(message);
 
-        // 2. 결과 메시지를 200 OK 상태코드와 함께 반환
-        return ResponseEntity.ok(message);
+        } catch (IllegalArgumentException e) {
+            // ★ 실패 시: JSON 형태로 반환 (400 Bad Request)
+            // 결과 예시: { "message": "이미 가입된 이메일입니다." }
+            return ResponseEntity.badRequest()
+                    .body(Collections.singletonMap("message", e.getMessage()));
+        }
     }
 
-    // ★ 로그인 API 추가
-    // POST http://localhost:8080/api/v1/auth/login
+    // 2. 로그인 API
     @PostMapping("/login")
-    public ResponseEntity<TokenResponseDto> login(@RequestBody LoginRequestDto requestDto) {
-        String token = userService.login(requestDto);
-        return ResponseEntity.ok(new TokenResponseDto(token));
+    public ResponseEntity<?> login(@RequestBody LoginRequestDto requestDto) {
+        try {
+            // 성공 시: 토큰 객체 반환 (200 OK)
+            String token = userService.login(requestDto);
+            return ResponseEntity.ok(new TokenResponseDto(token));
+
+        } catch (IllegalArgumentException e) {
+            // ★ 실패 시: JSON 형태로 반환 (400 Bad Request)
+            // 결과 예시: { "message": "이메일 또는 비밀번호가 잘못되었습니다." }
+            return ResponseEntity.badRequest()
+                    .body(Collections.singletonMap("message", e.getMessage()));
+        }
     }
 }
