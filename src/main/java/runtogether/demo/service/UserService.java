@@ -23,6 +23,14 @@ public class UserService {
     @Transactional // "이 작업(회원가입)은 하나의 단위(트랜잭션)로 처리되어야 합니다"
     public String registerUser(UserRequestDto requestDto) {
 
+        // [추가됨] ★ 이메일 중복 검사
+        // "혹시 이 이메일로 가입된 사람이 있나요?" 하고 물어봄
+        userRepository.findByEmail(requestDto.getEmail())
+                .ifPresent(user -> {
+                    // 만약 누군가 있다면(ifPresent), 에러를 던짐!
+                    throw new IllegalArgumentException("이미 가입된 이메일입니다.");
+                });
+
         // 2. 닉네임 중복 검사
         // requestDto에서 닉네임을 가져와 DB에 이미 존재하는지 확인
         userRepository.findByNickname(requestDto.getNickname())
@@ -44,17 +52,23 @@ public class UserService {
         return "회원가입이 완료되었습니다.";
     }
 
+    // 2. 로그인 기능
     public String login(LoginRequestDto requestDto) {
-        // 1. 이메일로 유저 찾기
-        User user = userRepository.findByEmail(requestDto.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("가입되지 않은 이메일입니다."));
+        // 공통 에러 메시지 정의
+        String errorMessage = "이메일 또는 비밀번호가 잘못되었습니다.";
 
-        // 2. 비밀번호 확인 (입력받은 비번 vs DB의 암호화된 비번)
+        // 1. 이메일 확인
+        // 없으면 "이메일 또는 비밀번호가 잘못되었습니다." 에러 발생
+        User user = userRepository.findByEmail(requestDto.getEmail())
+                .orElseThrow(() -> new IllegalArgumentException(errorMessage));
+
+        // 2. 비밀번호 확인
+        // 틀려도 "이메일 또는 비밀번호가 잘못되었습니다." 에러 발생
         if (!passwordEncoder.matches(requestDto.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+            throw new IllegalArgumentException(errorMessage);
         }
 
-        // 3. 인증 성공 시 토큰 발급
+        // 3. 통과하면 토큰 발급
         return jwtUtil.generateToken(user.getEmail());
     }
 }
