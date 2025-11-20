@@ -5,7 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import runtogether.demo.dto.GroupDto; // ★ 이게 있어야 함
+import runtogether.demo.dto.GroupDto;
 import runtogether.demo.service.GroupService;
 
 @RestController
@@ -15,18 +15,15 @@ public class GroupController {
 
     private final GroupService groupService;
 
-    // 1. 그룹 생성
     @PostMapping
     public ResponseEntity<String> createGroup(
             @AuthenticationPrincipal UserDetails userDetails,
-            @RequestBody GroupDto.CreateRequest request) { // ★ 여기 타입 확인
+            @RequestBody GroupDto.CreateRequest request) {
 
-        // 서비스에 있는 createGroup(String, GroupDto.CreateRequest)을 호출함
         Long groupId = groupService.createGroup(userDetails.getUsername(), request);
         return ResponseEntity.ok("그룹 생성 완료! ID: " + groupId);
     }
 
-    // 2. 코스 추가
     @PostMapping("/{groupId}/courses")
     public ResponseEntity<String> addCourse(
             @PathVariable Long groupId,
@@ -36,7 +33,6 @@ public class GroupController {
         return ResponseEntity.ok("코스 추가 완료!");
     }
 
-    // 3. 그룹 참여
     @PostMapping("/{groupId}/join")
     public ResponseEntity<String> joinGroup(
             @AuthenticationPrincipal UserDetails userDetails,
