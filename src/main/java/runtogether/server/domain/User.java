@@ -36,9 +36,11 @@ public class User {
     private String profileImageUrl;
 
     // [1단계용 생성자] 이메일과 비밀번호만으로 계정 생성
-    public User(String email, String password) {
+    public User(String email, String password, String nickname) {
         this.email = email;
         this.password = password;
+        this.nickname = nickname;
+        this.profileImageUrl = "default.png";
     }
 
     // [2단계용 메서드] 나중에 프로필 정보를 업데이트할 때 사용

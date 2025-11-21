@@ -10,6 +10,8 @@ import runtogether.server.dto.ProfileDto;
 import runtogether.server.dto.SignUpDto;
 import runtogether.server.util.JwtUtil;
 
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -21,45 +23,61 @@ public class UserService {
     // 1. 회원가입 (이메일, 비번만 저장)
     @Transactional
     public String registerUser(SignUpDto requestDto) {
-        // 이메일 중복 검사
         if (userRepository.findByEmail(requestDto.getEmail()).isPresent()) {
             throw new IllegalArgumentException("이미 가입된 이메일입니다.");
         }
 
         String encodedPassword = passwordEncoder.encode(requestDto.getPassword());
 
-        // 닉네임 없이 생성
-        User newUser = new User(requestDto.getEmail(), encodedPassword);
+        // ★ 랜덤 닉네임 생성 로직
+        // 예: "Runner_" + 랜덤8글자 -> "Runner_a1b2c3d4"
+        String randomNickname = "Runner_" + UUID.randomUUID().toString().substring(0, 8);
+
+        // 혹시나 랜덤 닉네임이 겹칠 확률은 0에 가깝지만,
+        // User 엔티티 생성자에 닉네임을 같이 넘겨줍니다.
+        User newUser = new User(requestDto.getEmail(), encodedPassword, randomNickname);
+
         userRepository.save(newUser);
 
-        return "회원가입 1단계 완료! 프로필을 설정해주세요.";
+        return "회원가입 1단계 완료! (임시 닉네임: " + randomNickname + ")";
     }
 
-    // 2. 프로필 설정 (닉네임, 성별 등 업데이트)
+    // 2. 프로필 설정
     @Transactional
     public void setupProfile(String email, ProfileDto requestDto) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
-        // 닉네임 중복 검사 (설정하려는 닉네임이 이미 있는지)
-        if (userRepository.findByNickname(requestDto.getNickname()).isPresent()) {
-            throw new IllegalArgumentException("이미 사용 중인 닉네임입니다.");
+        // ★ 1. 닉네임 처리 로직 변경
+        // 일단 기존 닉네임(랜덤 닉네임)을 기본값으로 잡음
+        String nicknameToSave = user.getNickname();
+
+        // 만약 사용자가 새 닉네임을 입력했다면? (null도 아니고 빈칸도 아님)
+        if (requestDto.getNickname() != null && !requestDto.getNickname().trim().isEmpty()) {
+            // 그리고 그게 기존 닉네임과 다르다면?
+            if (!nicknameToSave.equals(requestDto.getNickname())) {
+                // 중복 검사 실행
+                if (userRepository.findByNickname(requestDto.getNickname()).isPresent()) {
+                    throw new IllegalArgumentException("이미 사용 중인 닉네임입니다.");
+                }
+                // 통과하면 저장할 닉네임을 교체
+                nicknameToSave = requestDto.getNickname();
+            }
         }
 
-        // 프론트에서 보낸 이미지가 없거나(null) 비어있으면("") -> "default.png"로 설정
+        // ★ 2. 이미지 처리 (기존과 동일)
         String finalImageUrl = requestDto.getProfileImageUrl();
         if (finalImageUrl == null || finalImageUrl.trim().isEmpty()) {
-            finalImageUrl = "default.png"; // 기본 이미지 이름
+            finalImageUrl = "default.png";
         }
 
-        // 정보 업데이트 (User 엔티티에 만든 메서드 사용)
+        // ★ 3. 최종 업데이트 (nicknameToSave를 넣음)
         user.updateProfile(
-                requestDto.getNickname(),
+                nicknameToSave, // 입력했으면 새거, 안 했으면 랜덤 닉네임
                 requestDto.getGender(),
                 requestDto.getBirthDate(),
-                finalImageUrl // 처리된 이미지 주소 저장
+                finalImageUrl
         );
-        // @Transactional 덕분에 user.updateProfile만 해도 DB에 자동 저장됨 (Dirty Checking)
     }
 
     // 3. 로그인 (기존과 동일)
