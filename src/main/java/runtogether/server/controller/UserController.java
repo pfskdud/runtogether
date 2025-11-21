@@ -1,5 +1,6 @@
 package runtogether.server.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,7 +21,7 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody SignUpDto requestDto) {
+    public ResponseEntity<?> register(@Valid @RequestBody SignUpDto requestDto) {
         // try-catch 삭제! 에러 나면 알아서 GlobalExceptionHandler로 넘어감
         String message = userService.registerUser(requestDto);
         return ResponseEntity.ok(Collections.singletonMap("message", message));
@@ -30,7 +31,7 @@ public class UserController {
     @PostMapping("/profile")
     public ResponseEntity<?> setupProfile(
             @AuthenticationPrincipal String email, // ★ 수정: UserDetails -> String
-            @RequestBody ProfileDto requestDto) {
+            @Valid @RequestBody ProfileDto requestDto) {
 
         // ★ 수정: userDetails.getUsername() -> email 로 변경
         userService.setupProfile(email, requestDto);
@@ -38,7 +39,7 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequestDto requestDto) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequestDto requestDto) {
         String token = userService.login(requestDto);
         return ResponseEntity.ok(new TokenResponseDto(token));
     }

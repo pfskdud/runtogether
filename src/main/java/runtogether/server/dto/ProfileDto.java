@@ -1,6 +1,8 @@
 package runtogether.server.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,10 +15,13 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProfileDto {
+
     private String nickname;
+
+    @NotNull(message = "성별을 선택해주세요.")
     private Gender gender;
 
-    // ★ 여기가 핵심입니다. 이 줄이 없거나 오타가 있으면 날짜 에러가 납니다.
+    @NotNull(message = "생년월일을 입력해주세요.")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate birthDate;
 

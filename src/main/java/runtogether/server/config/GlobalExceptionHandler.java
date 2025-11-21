@@ -1,6 +1,7 @@
 package runtogether.server.config;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -16,6 +17,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException e) {
         return ResponseEntity.badRequest() // 400 Error
                 .body(Collections.singletonMap("message", e.getMessage()));
+    }
+
+    // ★ [추가] @Valid 검사 실패 시 발생하는 에러 잡기
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException e) {
+
+        // 에러 중에서 첫 번째 메시지(우리가 DTO에 적은 message)만 꺼냄
+        String errorMessage = e.getBindingResult().getAllErrors().get(0).getDefaultMessage();
+
+        return ResponseEntity.badRequest()
+                .body(Collections.singletonMap("message", errorMessage));
     }
 
     // 2. ★ [추가됨] 우리가 예상하지 못한 나머지 모든 에러(Exception) 잡기
