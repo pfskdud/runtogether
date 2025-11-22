@@ -30,9 +30,8 @@ public class GroupDto {
         private Double distance;
         private String description;
 
-        // 나중에 코스에도 예상 시간, 경로 데이터 추가할 때 여기에 넣으시면 됩니다.
-        // private Integer expectedTime;
-        // private String pathData;
+        private Integer expectedTime;
+        private String pathData;
     }
 
     // 3. 그룹 가입 요청
