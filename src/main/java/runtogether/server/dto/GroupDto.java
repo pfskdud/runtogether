@@ -1,6 +1,7 @@
 package runtogether.server.dto;
 
-import lombok.AllArgsConstructor; // ★ 추가
+import com.fasterxml.jackson.annotation.JsonProperty; // ★ 추가됨
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDate;
@@ -14,6 +15,11 @@ public class GroupDto {
         private String groupName;
         private LocalDate startDate;
         private LocalDate endDate;
+        private String description;
+
+        // ★ 수정됨: JSON에서 "isSecret"이라는 이름으로 들어오면 여기에 맵핑해라!
+        @JsonProperty("isSecret")
+        private boolean isSecret;
     }
 
     // 2. 코스 추가 요청
@@ -23,16 +29,32 @@ public class GroupDto {
         private String title;
         private Double distance;
         private String description;
+
+        // 나중에 코스에도 예상 시간, 경로 데이터 추가할 때 여기에 넣으시면 됩니다.
+        // private Integer expectedTime;
+        // private String pathData;
     }
 
-    // ★ [추가됨] 3. 그룹 목록 조회 응답용 (이게 없어서 에러남!)
+    // 3. 그룹 가입 요청
+    @Getter
+    @NoArgsConstructor
+    public static class JoinRequest {
+        private String accessCode;
+    }
+
+    // 4. 그룹 목록 조회 응답
     @Getter
     @AllArgsConstructor
     public static class Response {
         private Long groupId;
         private String groupName;
+        private String description;
+
+        @JsonProperty("isSecret") // 나갈 때도 "isSecret"으로 나가게 설정
+        private boolean isSecret;
+
         private String startDate;
         private String endDate;
-        private String ownerName; // 방장 이름
+        private String ownerName;
     }
 }
