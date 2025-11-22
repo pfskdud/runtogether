@@ -55,6 +55,8 @@ public class GroupService {
         Course course = new Course(
                 request.getTitle(),
                 request.getDistance(),
+                request.getExpectedTime(),
+                request.getPathData(),
                 request.getDescription(),
                 group
         );
