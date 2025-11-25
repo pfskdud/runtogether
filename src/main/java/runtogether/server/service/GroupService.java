@@ -132,4 +132,62 @@ public class GroupService {
     public List<GroupDto.Response> getAllGroups() {
         return getFilteredGroups(null, null, null);
     }
+
+    // 5. 그룹 상세 조회 (설정 페이지용)
+    @Transactional(readOnly = true)
+    public GroupDto.DetailResponse getGroupDetail(String email, Long groupId) {
+        RunningGroup group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+
+        // 요청한 사람이 방장인지 확인
+        boolean isOwner = group.getOwner().getId().equals(user.getId());
+
+        return new GroupDto.DetailResponse(
+                group.getId(),
+                group.getName(),
+                group.getDescription(),
+                group.isSecret(),
+                group.getAccessCode(), // 입장 코드 전달
+                isOwner
+        );
+    }
+
+    // 6. 그룹 수정 (방장만 가능)
+    @Transactional
+    public void updateGroup(String email, Long groupId, GroupDto.UpdateRequest request) {
+        RunningGroup group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+
+        // 방장 아니면 에러!
+        if (!group.getOwner().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("방장만 수정할 수 있습니다.");
+        }
+
+        // 이름 변경 (JPA의 Dirty Checking으로 자동 저장됨)
+        // RunningGroup 엔티티에 update 메서드 하나 만들어주면 더 좋음 (아래 참고)
+        group.updateInfo(request.getGroupName(), request.getDescription());
+    }
+
+    // 7. 그룹 삭제 (방장만 가능)
+    @Transactional
+    public void deleteGroup(String email, Long groupId) {
+        RunningGroup group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+
+        if (!group.getOwner().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("방장만 삭제할 수 있습니다.");
+        }
+
+        // 그룹 삭제 (연관된 코스, 참여정보 등은 Cascade 설정에 따라 같이 지워짐)
+        // Cascade 설정 안 했으면 여기서 courseRepository.deleteByGroup... 등을 먼저 해줘야 함
+        // 일단 그룹 삭제 시도
+        groupRepository.delete(group);
+    }
 }

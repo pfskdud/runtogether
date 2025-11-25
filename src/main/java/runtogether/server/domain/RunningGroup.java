@@ -70,4 +70,9 @@ public class RunningGroup {
 
         return sb.toString();
     }
+
+    public void updateInfo(String name, String description) {
+        this.name = name;
+        this.description = description;
+    }
 }

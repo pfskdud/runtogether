@@ -62,4 +62,24 @@ public class GroupDto {
         private String tags;
         private Integer currentPeople;
     }
+
+    // ★ [추가] 5. 그룹 수정 요청
+    @Getter
+    @NoArgsConstructor
+    public static class UpdateRequest {
+        private String groupName;
+        private String description;
+        // 필요하면 날짜, 인원 등도 추가 가능
+    }
+
+    @Getter
+    @AllArgsConstructor
+    public static class DetailResponse {
+        private Long groupId;
+        private String groupName;
+        private String description;
+        private boolean isSecret;
+        private String accessCode; // ★ 이게 있어야 QR코드 만듦!
+        private boolean isOwner;   // ★ 들어온 사람이 방장인지 알려줌 (수정/삭제 버튼 보여줄지 결정)
+    }
 }
