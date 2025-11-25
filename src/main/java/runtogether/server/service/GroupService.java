@@ -26,8 +26,6 @@ public class GroupService {
 
         RunningGroup group = new RunningGroup(
                 request.getGroupName(),
-                request.getStartDate(),
-                request.getEndDate(),
                 request.getDescription(),
                 request.isSecret(),
                 request.isSearchable(), // ★ 추가
@@ -91,23 +89,47 @@ public class GroupService {
         return "그룹 가입 완료!";
     }
 
-    // 4. 전체 그룹 목록 조회
+    // 4. 그룹 목록 조회 (검색 + 필터링 통합)
+    @Transactional(readOnly = true)
+    public List<GroupDto.Response> getFilteredGroups(String keyword, String status, String type) {
+        List<RunningGroup> groups;
+
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            groups = groupRepository.findAllByNameContainingOrTagsContaining(keyword, keyword);
+        } else {
+            groups = groupRepository.findAll();
+        }
+
+        return groups.stream()
+                .map(group -> {
+                    int currentCount = userGroupRepository.countByRunningGroup(group);
+                    return new GroupDto.Response(
+                            group.getId(),
+                            group.getName(),
+                            group.getDescription(),
+                            group.isSecret(),
+                            group.getOwner().getNickname(),
+                            group.getMaxPeople(),
+                            group.getTags(),
+                            currentCount
+                    );
+                })
+                .filter(dto -> {
+                    if ("public".equals(type) && dto.isSecret()) return false;
+
+                    if ("recruiting".equals(status)) {
+                        // ★ 수정: 날짜 체크 삭제함. 인원 꽉 찼는지만 확인.
+                        boolean isFull = dto.getMaxPeople() != null && dto.getCurrentPeople() >= dto.getMaxPeople();
+                        if (isFull) return false;
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
+    }
+
+    // 기존 getAllGroups는 getFilteredGroups가 대체하므로 삭제하거나 그냥 둬도 됨 (안 쓰임)
     @Transactional(readOnly = true)
     public List<GroupDto.Response> getAllGroups() {
-        return groupRepository.findAll().stream()
-                .map(group -> new GroupDto.Response(
-                        group.getId(),
-                        group.getName(),
-                        group.getDescription(),
-                        group.isSecret(),
-
-                        group.getStartDate().toString(),
-                        group.getEndDate().toString(),
-                        group.getOwner().getNickname(),
-
-                        group.getMaxPeople(),
-                        group.getTags()
-                ))
-                .collect(Collectors.toList());
+        return getFilteredGroups(null, null, null);
     }
 }

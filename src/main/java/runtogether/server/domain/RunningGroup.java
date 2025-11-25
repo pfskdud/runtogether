@@ -40,11 +40,9 @@ public class RunningGroup {
     private User owner;
 
     // 생성자
-    public RunningGroup(String name, LocalDate startDate, LocalDate endDate, String description,
+    public RunningGroup(String name, String description,
                         boolean isSecret, boolean isSearchable, Integer maxPeople, String tags, User owner) {
         this.name = name;
-        this.startDate = startDate;
-        this.endDate = endDate;
         this.description = description;
         this.isSecret = isSecret;
 

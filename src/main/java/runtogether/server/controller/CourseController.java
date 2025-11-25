@@ -17,11 +17,10 @@ public class CourseController {
 
     private final CourseService courseService;
 
-    // [삭제됨] createCourse API 삭제
-
-    // 2. 코스 목록 조회 API (GET)
-    @GetMapping
-    public ResponseEntity<List<CourseDto.Response>> getCourseList() {
-        return ResponseEntity.ok(courseService.getCourseList());
+    // ★ AI 추천 코스 API
+    // GET http://localhost:8080/api/v1/courses/recommendations
+    @GetMapping("/recommendations")
+    public ResponseEntity<List<CourseDto.Response>> getRecommendedCourses() {
+        return ResponseEntity.ok(courseService.getRecommendedCourses());
     }
 }
