@@ -20,11 +20,13 @@ public class UserController {
 
     private final UserService userService;
 
-    // ★ [추가됨] 이메일 중복 확인 API
-    // GET http://localhost:8080/api/v1/auth/check-email?email=test@example.com
-    @GetMapping("/check-email")
-    public ResponseEntity<?> checkEmailDuplicate(@RequestParam @Email String email) {
-        userService.checkEmailDuplicate(email);
+    // ★ [수정됨] 이메일 중복 확인 API (POST 방식)
+    // POST http://localhost:8080/api/v1/auth/check-email
+    // Body: { "email": "test@example.com" }
+    @PostMapping("/check-email")
+    public ResponseEntity<?> checkEmailDuplicate(@RequestBody @Valid CheckEmailDto requestDto) {
+        // DTO에서 이메일 꺼내서 서비스로 전달
+        userService.checkEmailDuplicate(requestDto.getEmail());
         return ResponseEntity.ok(Collections.singletonMap("message", "사용 가능한 이메일입니다."));
     }
 

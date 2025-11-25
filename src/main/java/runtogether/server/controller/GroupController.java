@@ -78,4 +78,42 @@ public class GroupController {
         // searchGroups 대신 getFilteredGroups를 호출합니다!
         return ResponseEntity.ok(groupService.getFilteredGroups(keyword, status, type));
     }
+
+    // 5. 그룹 상세 조회 (설정 페이지 진입 시 호출)
+    // GET http://localhost:8080/api/v1/groups/{groupId}
+    @GetMapping("/{groupId}")
+    public ResponseEntity<?> getGroupDetail(
+            @AuthenticationPrincipal String email,
+            @PathVariable Long groupId) {
+        return ResponseEntity.ok(groupService.getGroupDetail(email, groupId));
+    }
+
+    // 6. 그룹 수정 (이름 변경 등)
+    // PATCH http://localhost:8080/api/v1/groups/{groupId}
+    @PatchMapping("/{groupId}")
+    public ResponseEntity<?> updateGroup(
+            @AuthenticationPrincipal String email,
+            @PathVariable Long groupId,
+            @RequestBody GroupDto.UpdateRequest request) {
+        try {
+            groupService.updateGroup(email, groupId, request);
+            return ResponseEntity.ok(Collections.singletonMap("message", "그룹 정보가 수정되었습니다."));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("message", e.getMessage()));
+        }
+    }
+
+    // 7. 그룹 삭제
+    // DELETE http://localhost:8080/api/v1/groups/{groupId}
+    @DeleteMapping("/{groupId}")
+    public ResponseEntity<?> deleteGroup(
+            @AuthenticationPrincipal String email,
+            @PathVariable Long groupId) {
+        try {
+            groupService.deleteGroup(email, groupId);
+            return ResponseEntity.ok(Collections.singletonMap("message", "그룹이 삭제되었습니다."));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("message", e.getMessage()));
+        }
+    }
 }
