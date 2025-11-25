@@ -1,13 +1,12 @@
 package runtogether.server.controller;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import runtogether.server.dto.*;
 import runtogether.server.service.UserService;
 
@@ -16,9 +15,18 @@ import java.util.Collections;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
+@Validated
 public class UserController {
 
     private final UserService userService;
+
+    // ★ [추가됨] 이메일 중복 확인 API
+    // GET http://localhost:8080/api/v1/auth/check-email?email=test@example.com
+    @GetMapping("/check-email")
+    public ResponseEntity<?> checkEmailDuplicate(@RequestParam @Email String email) {
+        userService.checkEmailDuplicate(email);
+        return ResponseEntity.ok(Collections.singletonMap("message", "사용 가능한 이메일입니다."));
+    }
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody SignUpDto requestDto) {
