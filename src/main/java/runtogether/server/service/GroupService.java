@@ -6,6 +6,8 @@ import org.springframework.transaction.annotation.Transactional;
 import runtogether.server.domain.*;
 import runtogether.server.dto.GroupDto;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -17,6 +19,7 @@ public class GroupService {
     private final UserGroupRepository userGroupRepository;
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
+    private final RecordRepository recordRepository; // ★ 추가: 내 기록 조회용
 
     // 1. 그룹 생성
     @Transactional
@@ -28,9 +31,9 @@ public class GroupService {
                 request.getGroupName(),
                 request.getDescription(),
                 request.isSecret(),
-                request.isSearchable(), // ★ 추가
-                request.getMaxPeople(), // ★ 추가
-                request.getTags(),      // ★ 추가
+                request.isSearchable(),
+                request.getMaxPeople(),
+                request.getTags(),
                 user
         );
 
@@ -40,7 +43,7 @@ public class GroupService {
         return savedGroup.getId();
     }
 
-    // 컨트롤러에서 그룹 정보를 확인하기 위해 필요한 헬퍼 메서드
+    // 헬퍼 메서드
     @Transactional(readOnly = true)
     public RunningGroup getGroup(Long groupId) {
         return groupRepository.findById(groupId)
@@ -59,13 +62,14 @@ public class GroupService {
                 request.getExpectedTime(),
                 request.getPathData(),
                 request.getDescription(),
+                request.getStartDate(), // 날짜 저장
+                request.getEndDate(),   // 날짜 저장
                 group
         );
         courseRepository.save(course);
     }
 
-    // 3. 그룹 참여 (★ 여기가 수정되었습니다!)
-    // 매개변수에 String inputCode가 추가됨
+    // 3. 그룹 참여
     @Transactional
     public String joinGroup(String email, Long groupId, String inputCode) {
         User user = userRepository.findByEmail(email)
@@ -73,23 +77,27 @@ public class GroupService {
         RunningGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
 
-        // 이미 가입했는지 확인
         if (userGroupRepository.existsByUserAndRunningGroup(user, group)) {
             throw new IllegalArgumentException("이미 가입된 그룹입니다.");
         }
 
-        // ★ 비공개 그룹인데 코드가 틀렸는지 확인
         if (group.isSecret()) {
             if (inputCode == null || !inputCode.equals(group.getAccessCode())) {
                 throw new IllegalArgumentException("입장 코드가 올바르지 않습니다.");
             }
         }
 
+        // 인원 마감 체크
+        int currentCount = userGroupRepository.countByRunningGroup(group);
+        if (group.getMaxPeople() != null && currentCount >= group.getMaxPeople()) {
+            throw new IllegalArgumentException("정원이 초과되어 가입할 수 없습니다.");
+        }
+
         userGroupRepository.save(new UserGroup(user, group));
         return "그룹 가입 완료!";
     }
 
-    // 4. 그룹 목록 조회 (검색 + 필터링 통합)
+    // 4. 그룹 목록 조회 (검색 + 필터링)
     @Transactional(readOnly = true)
     public List<GroupDto.Response> getFilteredGroups(String keyword, String status, String type) {
         List<RunningGroup> groups;
@@ -117,8 +125,8 @@ public class GroupService {
                 .filter(dto -> {
                     if ("public".equals(type) && dto.isSecret()) return false;
 
+                    // 모집중 필터: 인원수만 체크 (날짜는 코스별로 다르니 생략)
                     if ("recruiting".equals(status)) {
-                        // ★ 수정: 날짜 체크 삭제함. 인원 꽉 찼는지만 확인.
                         boolean isFull = dto.getMaxPeople() != null && dto.getCurrentPeople() >= dto.getMaxPeople();
                         if (isFull) return false;
                     }
@@ -127,22 +135,16 @@ public class GroupService {
                 .collect(Collectors.toList());
     }
 
-    // 기존 getAllGroups는 getFilteredGroups가 대체하므로 삭제하거나 그냥 둬도 됨 (안 쓰임)
-    @Transactional(readOnly = true)
-    public List<GroupDto.Response> getAllGroups() {
-        return getFilteredGroups(null, null, null);
-    }
+    // 안 쓰는 getAllGroups는 삭제해도 됨
 
-    // 5. 그룹 상세 조회 (설정 페이지용)
+    // 5. 그룹 상세 조회 (설정용)
     @Transactional(readOnly = true)
     public GroupDto.DetailResponse getGroupDetail(String email, Long groupId) {
         RunningGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
-
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
-        // 요청한 사람이 방장인지 확인
         boolean isOwner = group.getOwner().getId().equals(user.getId());
 
         return new GroupDto.DetailResponse(
@@ -150,12 +152,12 @@ public class GroupService {
                 group.getName(),
                 group.getDescription(),
                 group.isSecret(),
-                group.getAccessCode(), // 입장 코드 전달
+                group.getAccessCode(),
                 isOwner
         );
     }
 
-    // 6. 그룹 수정 (방장만 가능)
+    // 6. 그룹 수정
     @Transactional
     public void updateGroup(String email, Long groupId, GroupDto.UpdateRequest request) {
         RunningGroup group = groupRepository.findById(groupId)
@@ -163,17 +165,13 @@ public class GroupService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
-        // 방장 아니면 에러!
         if (!group.getOwner().getId().equals(user.getId())) {
             throw new IllegalArgumentException("방장만 수정할 수 있습니다.");
         }
-
-        // 이름 변경 (JPA의 Dirty Checking으로 자동 저장됨)
-        // RunningGroup 엔티티에 update 메서드 하나 만들어주면 더 좋음 (아래 참고)
         group.updateInfo(request.getGroupName(), request.getDescription());
     }
 
-    // 7. 그룹 삭제 (방장만 가능)
+    // 7. 그룹 삭제
     @Transactional
     public void deleteGroup(String email, Long groupId) {
         RunningGroup group = groupRepository.findById(groupId)
@@ -184,10 +182,39 @@ public class GroupService {
         if (!group.getOwner().getId().equals(user.getId())) {
             throw new IllegalArgumentException("방장만 삭제할 수 있습니다.");
         }
-
-        // 그룹 삭제 (연관된 코스, 참여정보 등은 Cascade 설정에 따라 같이 지워짐)
-        // Cascade 설정 안 했으면 여기서 courseRepository.deleteByGroup... 등을 먼저 해줘야 함
-        // 일단 그룹 삭제 시도
         groupRepository.delete(group);
+    }
+
+    // ★ [추가] 8. 그룹 메인 화면 조회
+    @Transactional(readOnly = true)
+    public GroupDto.MainResponse getGroupMain(String email, Long groupId) {
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+        RunningGroup group = groupRepository.findById(groupId).orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
+
+        // 코스 정보 가져오기 (첫 번째 코스를 메인으로 사용)
+        // 주의: CourseRepository에 findByRunningGroup 메서드가 있어야 함!
+        Course mainCourse = courseRepository.findByRunningGroup(group).stream().findFirst()
+                .orElse(new Course("코스 없음", 0.0, 0, null, null, null, null, group));
+
+        double myTotalDistance = 0.0; // 기록 합산 로직 (일단 0)
+
+        // D-Day 및 기간 계산 (코스 기준)
+        long dDay = 0;
+        String datePeriod = "기간 미정";
+        if (mainCourse.getEndDate() != null) {
+            dDay = ChronoUnit.DAYS.between(LocalDate.now(), mainCourse.getEndDate());
+            datePeriod = mainCourse.getStartDate() + " - " + mainCourse.getEndDate();
+        }
+
+        return new GroupDto.MainResponse(
+                group.getName(),
+                mainCourse.getTitle(),
+                datePeriod,
+                dDay,
+                user.getNickname(),
+                myTotalDistance,
+                mainCourse.getDistance(),
+                user.getProfileImageUrl()
+        );
     }
 }
