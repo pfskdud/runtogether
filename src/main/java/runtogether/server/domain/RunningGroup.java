@@ -19,9 +19,6 @@ public class RunningGroup {
     @Column(nullable = false)
     private String name;
 
-    private LocalDate startDate;
-    private LocalDate endDate;
-
     @Column(length = 500)
     private String description;
 
@@ -39,17 +36,14 @@ public class RunningGroup {
     @JoinColumn(name = "owner_id")
     private User owner;
 
-    // 생성자
     public RunningGroup(String name, String description,
                         boolean isSecret, boolean isSearchable, Integer maxPeople, String tags, User owner) {
         this.name = name;
         this.description = description;
         this.isSecret = isSecret;
-
-        this.isSearchable = isSearchable; // 추가
-        this.maxPeople = maxPeople;       // 추가
+        this.isSearchable = isSearchable;
+        this.maxPeople = maxPeople;
         this.tags = tags;
-
         this.owner = owner;
 
         if (isSecret) {

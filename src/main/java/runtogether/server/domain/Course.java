@@ -3,6 +3,7 @@ package runtogether.server.domain;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import java.time.LocalDate;
 
 @Entity
 @Getter
@@ -31,17 +32,22 @@ public class Course {
     @Column(length = 1000)
     private String description;
 
+    private LocalDate startDate;
+    private LocalDate endDate;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_id")
     private RunningGroup runningGroup;
 
     // 생성자 업데이트 (새로운 필드 포함)
-    public Course(String title, Double distance, Integer expectedTime, String pathData, String description, RunningGroup runningGroup) {
+    public Course(String title, Double distance, Integer expectedTime, String pathData, String description, LocalDate startDate, LocalDate endDate, RunningGroup runningGroup) {
         this.title = title;
         this.distance = distance;
         this.expectedTime = expectedTime;
         this.pathData = pathData;
         this.description = description;
+        this.startDate = startDate;
+        this.endDate = endDate;
         this.runningGroup = runningGroup;
     }
 }
