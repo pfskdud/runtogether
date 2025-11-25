@@ -39,7 +39,15 @@ public class UserService {
 
         userRepository.save(newUser);
 
-        return "회원가입 1단계 완료! (임시 닉네임: " + randomNickname + ")";
+        return "회원가입 1단계 완료!";
+    }
+
+    @Transactional(readOnly = true)
+    public void checkEmailDuplicate(String email) {
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new IllegalArgumentException("이미 가입된 이메일입니다.");
+        }
+        // 아무 에러가 안 나면 사용 가능한 이메일임!
     }
 
     // 2. 프로필 설정

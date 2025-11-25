@@ -39,7 +39,7 @@ public class GroupService {
         return savedGroup.getId();
     }
 
-    // ★ [추가됨] 컨트롤러에서 그룹 정보를 확인하기 위해 필요한 헬퍼 메서드
+    // 컨트롤러에서 그룹 정보를 확인하기 위해 필요한 헬퍼 메서드
     @Transactional(readOnly = true)
     public RunningGroup getGroup(Long groupId) {
         return groupRepository.findById(groupId)
