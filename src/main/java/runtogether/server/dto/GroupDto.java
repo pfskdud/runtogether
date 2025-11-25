@@ -8,18 +8,24 @@ import java.time.LocalDate;
 
 public class GroupDto {
 
-    // 1. 그룹 생성 요청
+    // 1. 그룹 생성 요청 (UI에 맞춰 필드 추가)
     @Getter
     @NoArgsConstructor
     public static class CreateRequest {
         private String groupName;
-        private LocalDate startDate;
-        private LocalDate endDate;
-        private String description;
+        private LocalDate startDate; // 앱에서는 안 보이지만 필요하다면 유지, 아니면 삭제
+        private LocalDate endDate;   // 상동
+        private String description;  // 그룹 소개
 
-        // ★ 수정됨: JSON에서 "isSecret"이라는 이름으로 들어오면 여기에 맵핑해라!
         @JsonProperty("isSecret")
-        private boolean isSecret;
+        private boolean isSecret;     // 공개 여부
+
+        @JsonProperty("isSearchable")
+        private boolean isSearchable; // ★ 추가: 검색 허용
+
+        private Integer maxPeople;    // ★ 추가: 그룹 인원
+
+        private String tags;          // ★ 추가: 태그 (예: "오운완,한강")
     }
 
     // 2. 코스 추가 요청
@@ -55,5 +61,8 @@ public class GroupDto {
         private String startDate;
         private String endDate;
         private String ownerName;
+
+        private Integer maxPeople;
+        private String tags;
     }
 }
