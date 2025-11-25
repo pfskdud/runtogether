@@ -23,18 +23,20 @@ public class GroupController {
     public ResponseEntity<?> createGroup(
             @AuthenticationPrincipal String email,
             @RequestBody GroupDto.CreateRequest request) {
+        try {
+            Long groupId = groupService.createGroup(email, request);
 
-        Long groupId = groupService.createGroup(email, request);
+            RunningGroup group = groupService.getGroup(groupId);
+            String message = "그룹 생성 완료!";
+            if (group.isSecret()) {
+                message += " [입장코드: " + group.getAccessCode() + "]";
+            }
 
-        // 생성된 그룹 정보를 가져와서, 비공개면 '입장 코드'도 같이 알려줌
-        RunningGroup group = groupService.getGroup(groupId);
-        String message = "그룹 생성 완료!";
+            return ResponseEntity.ok(Collections.singletonMap("message", message));
 
-        if (group.isSecret()) {
-            message += " [입장코드: " + group.getAccessCode() + "]";
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("message", e.getMessage()));
         }
-
-        return ResponseEntity.ok(Collections.singletonMap("message", message));
     }
 
     // 2. 코스 추가
@@ -51,23 +53,29 @@ public class GroupController {
     }
 
     // 3. 그룹 참여
-    // 코드(accessCode)는 Body에 담아서 보냄. 공개 그룹이면 빈칸으로 보냄.
     @PostMapping("/{groupId}/join")
     public ResponseEntity<?> joinGroup(
             @AuthenticationPrincipal String email,
             @PathVariable Long groupId,
             @RequestBody(required = false) GroupDto.JoinRequest request) {
-        // required = false: 공개 그룹일 땐 body 아예 안 보내도 되게 함
-
-        String code = (request != null) ? request.getAccessCode() : null;
-
-        String message = groupService.joinGroup(email, groupId, code);
-        return ResponseEntity.ok(Collections.singletonMap("message", message));
+        try {
+            String code = (request != null) ? request.getAccessCode() : null;
+            String message = groupService.joinGroup(email, groupId, code);
+            return ResponseEntity.ok(Collections.singletonMap("message", message));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("message", e.getMessage()));
+        }
     }
 
-    // 4. 전체 그룹 목록 조회
+    // 4. ★ [수정됨] 그룹 목록 조회 (검색 + 필터링 통합)
+    // 사용법: GET /api/v1/groups?keyword=한강&status=recruiting&type=public
     @GetMapping
-    public ResponseEntity<List<GroupDto.Response>> getAllGroups() {
-        return ResponseEntity.ok(groupService.getAllGroups());
+    public ResponseEntity<List<GroupDto.Response>> getGroupList(
+            @RequestParam(required = false) String keyword, // 검색어
+            @RequestParam(required = false) String status,  // 모집 상태 (recruiting)
+            @RequestParam(required = false) String type     // 공개 여부 (public)
+    ) {
+        // searchGroups 대신 getFilteredGroups를 호출합니다!
+        return ResponseEntity.ok(groupService.getFilteredGroups(keyword, status, type));
     }
 }

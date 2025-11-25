@@ -13,8 +13,6 @@ public class GroupDto {
     @NoArgsConstructor
     public static class CreateRequest {
         private String groupName;
-        private LocalDate startDate; // 앱에서는 안 보이지만 필요하다면 유지, 아니면 삭제
-        private LocalDate endDate;   // 상동
         private String description;  // 그룹 소개
 
         @JsonProperty("isSecret")
@@ -58,11 +56,10 @@ public class GroupDto {
         @JsonProperty("isSecret") // 나갈 때도 "isSecret"으로 나가게 설정
         private boolean isSecret;
 
-        private String startDate;
-        private String endDate;
         private String ownerName;
 
         private Integer maxPeople;
         private String tags;
+        private Integer currentPeople;
     }
 }
