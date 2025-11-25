@@ -30,6 +30,9 @@ public class GroupService {
                 request.getEndDate(),
                 request.getDescription(),
                 request.isSecret(),
+                request.isSearchable(), // ★ 추가
+                request.getMaxPeople(), // ★ 추가
+                request.getTags(),      // ★ 추가
                 user
         );
 
@@ -97,9 +100,13 @@ public class GroupService {
                         group.getName(),
                         group.getDescription(),
                         group.isSecret(),
+
                         group.getStartDate().toString(),
                         group.getEndDate().toString(),
-                        group.getOwner().getNickname()
+                        group.getOwner().getNickname(),
+
+                        group.getMaxPeople(),
+                        group.getTags()
                 ))
                 .collect(Collectors.toList());
     }

@@ -27,6 +27,10 @@ public class RunningGroup {
 
     private boolean isSecret;
 
+    private Integer maxPeople;
+    private boolean isSearchable;
+    private String tags;
+
     // 코드가 길어질 수 있으니 넉넉하게 저장
     @Column(unique = true)
     private String accessCode;
@@ -36,12 +40,18 @@ public class RunningGroup {
     private User owner;
 
     // 생성자
-    public RunningGroup(String name, LocalDate startDate, LocalDate endDate, String description, boolean isSecret, User owner) {
+    public RunningGroup(String name, LocalDate startDate, LocalDate endDate, String description,
+                        boolean isSecret, boolean isSearchable, Integer maxPeople, String tags, User owner) {
         this.name = name;
         this.startDate = startDate;
         this.endDate = endDate;
         this.description = description;
         this.isSecret = isSecret;
+
+        this.isSearchable = isSearchable; // 추가
+        this.maxPeople = maxPeople;       // 추가
+        this.tags = tags;
+
         this.owner = owner;
 
         if (isSecret) {
