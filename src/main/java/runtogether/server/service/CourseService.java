@@ -71,11 +71,11 @@ public class CourseService {
         String mockPathData = "[{lat:37.546,lng:126.964}, {lat:37.542,lng:126.961}, {lat:37.533,lng:126.940}, {lat:37.528,lng:126.933}]";
 
         return new CourseDto.Response(
-                -999L, // 저장된 코스가 아니므로 임시 ID
-                start + " ~ " + end + " 러닝 코스", // 제목 자동 생성
+                -999L,
+                start + " ~ " + end + " 러닝 코스",
                 description,
-                10.0, // 거리 (10km)
-                60,   // 예상 시간 (60분)
+                10.0,
+                60,
                 mockPathData
         );
     }

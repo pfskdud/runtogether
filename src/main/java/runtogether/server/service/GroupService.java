@@ -19,7 +19,7 @@ public class GroupService {
     private final UserGroupRepository userGroupRepository;
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
-    private final RecordRepository recordRepository; // ★ 추가: 내 기록 조회용
+    private final RunRecordRepository runRecordRepository; // ★ 추가: 내 기록 조회용
 
     // 1. 그룹 생성
     @Transactional
@@ -216,5 +216,32 @@ public class GroupService {
                 mainCourse.getDistance(),
                 user.getProfileImageUrl()
         );
+    }
+
+    // 9. ★ [수정됨] 내 대회 목록 조회 (위치 조정 완료)
+    @Transactional(readOnly = true)
+    public List<GroupDto.Response> getMyGroups(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+
+        List<UserGroup> myUserGroups = userGroupRepository.findAllByUser(user);
+
+        return myUserGroups.stream()
+                .map(userGroup -> {
+                    RunningGroup group = userGroup.getRunningGroup();
+                    int currentCount = userGroupRepository.countByRunningGroup(group);
+
+                    return new GroupDto.Response(
+                            group.getId(),
+                            group.getName(),
+                            group.getDescription(),
+                            group.isSecret(),
+                            group.getOwner().getNickname(),
+                            group.getMaxPeople(),
+                            group.getTags(),
+                            currentCount
+                    );
+                })
+                .collect(Collectors.toList());
     }
 }
