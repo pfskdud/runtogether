@@ -116,4 +116,13 @@ public class GroupController {
             return ResponseEntity.badRequest().body(Collections.singletonMap("message", e.getMessage()));
         }
     }
+
+    // ★ [추가] 내 대회 목록 조회 API
+    // GET http://localhost:8080/api/v1/groups/my
+    @GetMapping("/my")
+    public ResponseEntity<List<GroupDto.Response>> getMyGroups(
+            @AuthenticationPrincipal String email) {
+
+        return ResponseEntity.ok(groupService.getMyGroups(email));
+    }
 }

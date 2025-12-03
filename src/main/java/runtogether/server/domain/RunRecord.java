@@ -32,11 +32,27 @@ public class RunRecord {
 
     private LocalDateTime createdAt; // 기록 생성 날짜 (언제 뛰었는지)
 
+    private Double distance;    // 총 거리 (8.2km)
+    private String averagePace; // 평균 페이스 (6'52"/km)
+    private Integer heartRate;  // 평균 심박수 (148)
+    private Integer calories;   // 칼로리 (612)
+
+    // ★ [추가] 구간별 기록 & 그래프 데이터 (복잡한 JSON은 문자열로 저장)
+    // 예: [{"section":"1km", "time":"06:41"}, ...]
+    @Column(columnDefinition = "TEXT")
+    private String sectionJson;
+
     // 생성자
-    public RunRecord(User user, Course course, String runTime) {
+    public RunRecord(User user, Course course, String runTime, Double distance,
+                     String averagePace, Integer heartRate, Integer calories, String sectionJson) {
         this.user = user;
         this.course = course;
         this.runTime = runTime;
-        this.createdAt = LocalDateTime.now(); // 생성되는 순간 현재 시간 저장
+        this.distance = distance;
+        this.averagePace = averagePace;
+        this.heartRate = heartRate;
+        this.calories = calories;
+        this.sectionJson = sectionJson;
+        this.createdAt = LocalDateTime.now();
     }
 }
