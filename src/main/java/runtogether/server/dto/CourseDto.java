@@ -13,6 +13,7 @@ public class CourseDto {
         private String endLocation;   // 도착지 (예: "여의도공원")
     }
 
+
     // ★ [수정됨] AI 추천 코스 응답용 DTO (7개 필드)
     @Getter
     @AllArgsConstructor
