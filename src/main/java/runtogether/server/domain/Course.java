@@ -50,4 +50,11 @@ public class Course {
         this.endDate = endDate;
         this.runningGroup = runningGroup;
     }
+
+    // ★★★ [추가] 그룹 생성 시 코스 정보를 업데이트하는 메소드
+    public void updateGroupAndSchedule(RunningGroup group, LocalDate startDate, LocalDate endDate) {
+        this.runningGroup = group;  // 이 코스의 주인을 그룹으로 설정
+        this.startDate = startDate; // 시작일 변경
+        this.endDate = endDate;     // 종료일 변경
+    }
 }

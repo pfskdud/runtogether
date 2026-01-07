@@ -7,6 +7,7 @@ import runtogether.server.domain.*;
 import runtogether.server.dto.GroupDto;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -19,13 +20,24 @@ public class GroupService {
     private final UserGroupRepository userGroupRepository;
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
-    private final RunRecordRepository runRecordRepository; // ★ 추가: 내 기록 조회용
+    private final RunRecordRepository runRecordRepository;
+
+    // ★ [추가됨] Controller에서 사용하는 단순 조회 헬퍼 메소드
+    // 이게 없어서 방금 에러가 났던 겁니다!
+    @Transactional(readOnly = true)
+    public RunningGroup getGroup(Long groupId) {
+        return groupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
+    }
 
     // 1. 그룹 생성
     @Transactional
-    public Long createGroup(String email, GroupDto.CreateRequest request) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+    public Long createGroup(String userEmail, GroupDto.CreateRequest request) {
+        System.out.println("====== [1] createGroup 시작! 요청 이메일: " + userEmail);
+        User owner = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        System.out.println("====== [2] 방장 찾기 성공: " + owner.getNickname());
 
         RunningGroup group = new RunningGroup(
                 request.getGroupName(),
@@ -34,20 +46,27 @@ public class GroupService {
                 request.isSearchable(),
                 request.getMaxPeople(),
                 request.getTags(),
-                user
+                owner
         );
-
+        System.out.println("====== [3] 그룹 객체 생성 완료");
         RunningGroup savedGroup = groupRepository.save(group);
-        userGroupRepository.save(new UserGroup(user, savedGroup));
+        System.out.println("====== [4] 그룹 DB 저장 완료 ID: " + savedGroup.getId());
+
+        userGroupRepository.save(new UserGroup(owner, savedGroup));
+        System.out.println("====== [5] 방장 멤버 등록 완료");
+
+        if (request.getCourseId() != null) {
+            System.out.println("====== [6] 코스 연결 시도. 코스ID: " + request.getCourseId());
+            Course course = courseRepository.findById(request.getCourseId())
+                    .orElseThrow(() -> new IllegalArgumentException("해당 코스가 존재하지 않습니다."));
+
+            System.out.println("====== [7] 코스 찾기 성공: " + course.getTitle());
+            LocalDate start = LocalDate.parse(request.getStartDate(), DateTimeFormatter.ISO_DATE);
+            LocalDate end = LocalDate.parse(request.getEndDate(), DateTimeFormatter.ISO_DATE);
+            course.updateGroupAndSchedule(savedGroup, start, end);
+        }
 
         return savedGroup.getId();
-    }
-
-    // 헬퍼 메서드
-    @Transactional(readOnly = true)
-    public RunningGroup getGroup(Long groupId) {
-        return groupRepository.findById(groupId)
-                .orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
     }
 
     // 2. 코스 추가
@@ -56,14 +75,17 @@ public class GroupService {
         RunningGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
 
+        LocalDate start = LocalDate.parse(request.getStartDate());
+        LocalDate end = LocalDate.parse(request.getEndDate());
+
         Course course = new Course(
                 request.getTitle(),
                 request.getDistance(),
                 request.getExpectedTime(),
                 request.getPathData(),
                 request.getDescription(),
-                request.getStartDate(), // 날짜 저장
-                request.getEndDate(),   // 날짜 저장
+                start,
+                end,
                 group
         );
         courseRepository.save(course);
@@ -72,10 +94,8 @@ public class GroupService {
     // 3. 그룹 참여
     @Transactional
     public String joinGroup(String email, Long groupId, String inputCode) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
-        RunningGroup group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+        RunningGroup group = groupRepository.findById(groupId).orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
 
         if (userGroupRepository.existsByUserAndRunningGroup(user, group)) {
             throw new IllegalArgumentException("이미 가입된 그룹입니다.");
@@ -87,7 +107,6 @@ public class GroupService {
             }
         }
 
-        // 인원 마감 체크
         int currentCount = userGroupRepository.countByRunningGroup(group);
         if (group.getMaxPeople() != null && currentCount >= group.getMaxPeople()) {
             throw new IllegalArgumentException("정원이 초과되어 가입할 수 없습니다.");
@@ -97,7 +116,7 @@ public class GroupService {
         return "그룹 가입 완료!";
     }
 
-    // 4. 그룹 목록 조회 (검색 + 필터링)
+    // 4. 그룹 목록 조회
     @Transactional(readOnly = true)
     public List<GroupDto.Response> getFilteredGroups(String keyword, String status, String type) {
         List<RunningGroup> groups;
@@ -111,6 +130,10 @@ public class GroupService {
         return groups.stream()
                 .map(group -> {
                     int currentCount = userGroupRepository.countByRunningGroup(group);
+
+                    Long courseId = courseRepository.findByRunningGroup(group)
+                            .stream().findFirst().map(Course::getId).orElse(null);
+
                     return new GroupDto.Response(
                             group.getId(),
                             group.getName(),
@@ -119,13 +142,12 @@ public class GroupService {
                             group.getOwner().getNickname(),
                             group.getMaxPeople(),
                             group.getTags(),
-                            currentCount
+                            currentCount,
+                            courseId
                     );
                 })
                 .filter(dto -> {
                     if ("public".equals(type) && dto.isSecret()) return false;
-
-                    // 모집중 필터: 인원수만 체크 (날짜는 코스별로 다르니 생략)
                     if ("recruiting".equals(status)) {
                         boolean isFull = dto.getMaxPeople() != null && dto.getCurrentPeople() >= dto.getMaxPeople();
                         if (isFull) return false;
@@ -135,9 +157,7 @@ public class GroupService {
                 .collect(Collectors.toList());
     }
 
-    // 안 쓰는 getAllGroups는 삭제해도 됨
-
-    // 5. 그룹 상세 조회 (설정용)
+    // 5. 그룹 상세 조회
     @Transactional(readOnly = true)
     public GroupDto.DetailResponse getGroupDetail(String email, Long groupId) {
         RunningGroup group = groupRepository.findById(groupId)
@@ -147,13 +167,19 @@ public class GroupService {
 
         boolean isOwner = group.getOwner().getId().equals(user.getId());
 
+        Course course = courseRepository.findByRunningGroup(group).stream()
+                .findFirst()
+                .orElse(null);
+        Long courseId = (course != null) ? course.getId() : null;
+
         return new GroupDto.DetailResponse(
                 group.getId(),
                 group.getName(),
                 group.getDescription(),
                 group.isSecret(),
                 group.getAccessCode(),
-                isOwner
+                isOwner,
+                courseId
         );
     }
 
@@ -185,40 +211,47 @@ public class GroupService {
         groupRepository.delete(group);
     }
 
-    // ★ [추가] 8. 그룹 메인 화면 조회
+    // 8. 그룹 메인 화면 조회
     @Transactional(readOnly = true)
     public GroupDto.MainResponse getGroupMain(String email, Long groupId) {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalArgumentException("유저 없음"));
-        RunningGroup group = groupRepository.findById(groupId).orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+        RunningGroup group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
 
-        // 코스 정보 가져오기 (첫 번째 코스를 메인으로 사용)
-        // 주의: CourseRepository에 findByRunningGroup 메서드가 있어야 함!
-        Course mainCourse = courseRepository.findByRunningGroup(group).stream().findFirst()
-                .orElse(new Course("코스 없음", 0.0, 0, null, null, null, null, group));
+        Course mainCourse = courseRepository.findByRunningGroup(group)
+                .stream().findFirst().orElse(null);
 
-        double myTotalDistance = 0.0; // 기록 합산 로직 (일단 0)
+        String courseName = (mainCourse != null) ? mainCourse.getTitle() : "등록된 코스 없음";
+        Double goalDistance = (mainCourse != null) ? mainCourse.getDistance() : 0.0;
 
-        // D-Day 및 기간 계산 (코스 기준)
-        long dDay = 0;
-        String datePeriod = "기간 미정";
-        if (mainCourse.getEndDate() != null) {
-            dDay = ChronoUnit.DAYS.between(LocalDate.now(), mainCourse.getEndDate());
-            datePeriod = mainCourse.getStartDate() + " - " + mainCourse.getEndDate();
+        Long courseId = (mainCourse != null) ? mainCourse.getId() : null;
+
+        String datePeriod = "";
+        String dDayString = "D-Day";
+
+        if (mainCourse != null && mainCourse.getStartDate() != null) {
+            datePeriod = mainCourse.getStartDate() + " ~ " + mainCourse.getEndDate();
+            long days = ChronoUnit.DAYS.between(LocalDate.now(), mainCourse.getStartDate());
+            if (days > 0) dDayString = "D-" + days;
+            else if (days == 0) dDayString = "D-Day";
+            else dDayString = "D+" + Math.abs(days);
         }
 
         return new GroupDto.MainResponse(
                 group.getName(),
-                mainCourse.getTitle(),
+                courseName,
                 datePeriod,
-                dDay,
+                dDayString,
                 user.getNickname(),
-                myTotalDistance,
-                mainCourse.getDistance(),
-                user.getProfileImageUrl()
+                0.0,
+                goalDistance,
+                "dummy_profile_url",
+                courseId
         );
     }
 
-    // 9. ★ [수정됨] 내 대회 목록 조회 (위치 조정 완료)
+    // 9. 내 그룹 목록 조회
     @Transactional(readOnly = true)
     public List<GroupDto.Response> getMyGroups(String email) {
         User user = userRepository.findByEmail(email)
@@ -231,6 +264,9 @@ public class GroupService {
                     RunningGroup group = userGroup.getRunningGroup();
                     int currentCount = userGroupRepository.countByRunningGroup(group);
 
+                    Long courseId = courseRepository.findByRunningGroup(group)
+                            .stream().findFirst().map(Course::getId).orElse(null);
+
                     return new GroupDto.Response(
                             group.getId(),
                             group.getName(),
@@ -239,7 +275,8 @@ public class GroupService {
                             group.getOwner().getNickname(),
                             group.getMaxPeople(),
                             group.getTags(),
-                            currentCount
+                            currentCount,
+                            courseId
                     );
                 })
                 .collect(Collectors.toList());

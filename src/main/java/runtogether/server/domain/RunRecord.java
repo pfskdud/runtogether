@@ -3,56 +3,66 @@ package runtogether.server.domain;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
 import java.time.LocalDateTime;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
 @NoArgsConstructor
-@Table(name = "records")
-public class RunRecord {
+public class RunRecord extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "record_id")
     private Long id;
 
-    // ★ 핵심: N:1 관계 설정 (기록 N개 : 유저 1명)
+    // 누가, 어디서 뛰었는지
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id") // DB에 user_id 라는 컬럼으로 저장됨
+    @JoinColumn(name = "user_id")
     private User user;
 
-    // ★ 핵심: N:1 관계 설정 (기록 N개 : 코스 1개)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id") // DB에 course_id 라는 컬럼으로 저장됨
+    @JoinColumn(name = "course_id")
     private Course course;
 
-    @Column(nullable = false)
-    private String runTime; // 완주 시간 (예: "00:45:20")
+    // [핵심 데이터]
+    private String runTime;      // "56:42"
+    private Double distance;     // 8.2 (km)
+    private String averagePace;  // "6'52""
+    private Integer calories;    // 612 (kcal)
+    private Integer heartRate;   // 148 (bpm)
+    private LocalDateTime endTime;
 
-    private LocalDateTime createdAt; // 기록 생성 날짜 (언제 뛰었는지)
-
-    private Double distance;    // 총 거리 (8.2km)
-    private String averagePace; // 평균 페이스 (6'52"/km)
-    private Integer heartRate;  // 평균 심박수 (148)
-    private Integer calories;   // 칼로리 (612)
-
-    // ★ [추가] 구간별 기록 & 그래프 데이터 (복잡한 JSON은 문자열로 저장)
-    // 예: [{"section":"1km", "time":"06:41"}, ...]
+    // [상세 데이터 - 텍스트나 JSON으로 긴 내용 저장]
     @Column(columnDefinition = "TEXT")
-    private String sectionJson;
+    private String sectionJson;  // 구간별 기록 (표/그래프용)
 
-    // 생성자
+    @Column(columnDefinition = "TEXT")
+    private String routeData;    // 이동 경로 (지도 그리기용)
+
+    // ▼ [추가] 분석 결과 멘트
+    private String analysisResult;
+
+    // ★ [추가] Laps 테이블과 1:N 관계 연결
+    // mappedBy = "runRecord"는 Lap.java 안에 있는 변수명과 같아야 함
+    @OneToMany(mappedBy = "runRecord", cascade = CascadeType.ALL)
+    private List<Lap> laps = new ArrayList<>();
+
+    // 생성자 (분석 결과 추가)
     public RunRecord(User user, Course course, String runTime, Double distance,
-                     String averagePace, Integer heartRate, Integer calories, String sectionJson) {
+                     String averagePace, Integer calories, Integer heartRate,
+                     String sectionJson, String routeData, String analysisResult, LocalDateTime endTime) {
         this.user = user;
         this.course = course;
         this.runTime = runTime;
         this.distance = distance;
         this.averagePace = averagePace;
-        this.heartRate = heartRate;
         this.calories = calories;
+        this.heartRate = heartRate;
         this.sectionJson = sectionJson;
-        this.createdAt = LocalDateTime.now();
+        this.routeData = routeData;
+        this.analysisResult = analysisResult;
+        this.endTime = endTime;
     }
 }

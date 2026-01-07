@@ -2,8 +2,15 @@ package runtogether.server.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import runtogether.server.domain.Course;
+import runtogether.server.domain.CourseRepository;
+import runtogether.server.domain.RunningGroup;
+import runtogether.server.domain.RunningGroupRepository;
 import runtogether.server.dto.CourseDto;
+import runtogether.server.dto.GroupDto;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,72 +18,80 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CourseService {
 
-    // ★ AI 추천 코스 목록 조회 (하드코딩 버전)
+    private final CourseRepository courseRepository;
+    private final RunningGroupRepository groupRepository;
+
+    // ★ 테스트용 고정 경로 데이터 (여의도 좌표)
+    // 프론트엔드 테스트를 위해 무조건 이 경로만 반환합니다.
+    private final String FIXED_PATH = "[{\"lat\":37.528,\"lng\":126.933},{\"lat\":37.529,\"lng\":126.935},{\"lat\":37.530,\"lng\":126.938},{\"lat\":37.531,\"lng\":126.940},{\"lat\":37.532,\"lng\":126.942}]";
+
+    // 1. 추천 코스 조회 (무조건 고정된 1개만 반환)
+    @Transactional(readOnly = true)
     public List<CourseDto.Response> getRecommendedCourses() {
         List<CourseDto.Response> list = new ArrayList<>();
 
-        // 1. 석촌 호수 루프
+        // 딱 하나만 추가
         list.add(new CourseDto.Response(
-                -1L,
-                "석촌 호수 루프",
-                "신호등이 없고 바닥이 우레탄이라 부상 위험이 적어요! 야경이 예뻐 밤에 뛰기 아주 좋습니다!",
-                2.5,
-                20,
-                "[{lat:37.50,lng:127.05}, {lat:37.51,lng:127.06}]" // 임시 좌표
-        ));
-
-        // 2. 여의도 고구마 코스
-        list.add(new CourseDto.Response(
-                -2L,
-                "여의도 고구마 코스",
-                "지도 앱으로 경로를 그리면 고구마 모양이 나와서 러너들 사이에서 매우 유명한 인증샷 코스예요!",
-                8.2,
-                60,
-                "[{lat:37.52,lng:126.92}, {lat:37.53,lng:126.93}]"
-        ));
-
-        // 3. 한강 시민공원 코스
-        list.add(new CourseDto.Response(
-                -3L,
-                "한강 시민공원 코스",
-                "여의도 공원 출발 -> 반포지구 -> 잠실지구 근처 반환 -> 여의도 복귀",
-                21.09,
-                120,
-                "[{lat:37.53,lng:126.92}, {lat:37.51,lng:126.99}]"
+                -1L, // 임시 ID
+                "여의도 벚꽃 러닝 코스", // 제목
+                "봄에는 벚꽃, 가을에는 단풍! 한강 바람을 맞으며 뛰는 최고의 힐링 코스입니다. (테스트용 고정 데이터)", // 설명
+                5.2, // 거리 (km)
+                35,  // 소요 시간 (분)
+                FIXED_PATH // 경로 데이터
         ));
 
         return list;
     }
 
-    // ★ [추가] 경로 검색 서비스 (Mock Data)
+    // 2. 경로 검색 (무얼 검색해도 여의도 코스 반환)
     public CourseDto.Response searchRoute(CourseDto.RouteRequest request) {
-
-        String start = request.getStartLocation();
-        String end = request.getEndLocation();
-
-        // 나중에는 여기서 TMap API를 호출해서 진짜 길 찾기 결과를 받아오면 됩니다.
-        // 지금은 "숙명여자대학교" -> "여의도공원" 예시 데이터를 반환합니다.
-
-        String description = """
-                숙명여자대학교 정문 (고지대)
-                → 효창공원 (녹지 구간, 가벼운 조깅)
-                → 공덕역 ~ 마포대교 북단 진입로 (도심 구간)
-                → 마포대교 횡단 (하이라이트, 바람을 맞으며 한강 뷰)
-                → 여의도 한강공원 물빛광장 (평지 스피드 구간)
-                → 샛강생태공원 산책로 (자연 뷰)
-                → 여의도 공원 문화의 마당 (탁 트인 광장)
-                """;
-
-        // 실제로는 API가 주는 좌표 리스트가 들어갑니다.
-        String mockPathData = "[{lat:37.546,lng:126.964}, {lat:37.542,lng:126.961}, {lat:37.533,lng:126.940}, {lat:37.528,lng:126.933}]";
-
+        // 사용자가 입력한 출발지/도착지는 제목에만 보여주고, 내용은 여의도로 고정
         return new CourseDto.Response(
                 -999L,
-                start + " ~ " + end + " 러닝 코스",
-                description,
-                10.0,
-                60,
-                mockPathData
+                request.getStartLocation() + " ~ " + request.getEndLocation() + " (추천 코스)",
+                "검색하신 지역의 러닝하기 가장 좋은 코스로 '여의도 벚꽃 코스'를 추천합니다!",
+                5.2,
+                35,
+                FIXED_PATH
+        );
+    }
+
+    // 3. 코스 추가 (그룹 생성 시 코스 저장용 - DB 연동 유지)
+    @Transactional
+    public void addCourse(Long groupId, GroupDto.AddCourseRequest request) {
+        RunningGroup group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
+
+        // ★ [추가됨] 글자("2025-05-01")를 날짜로 변환!
+        LocalDate start = LocalDate.parse(request.getStartDate());
+        LocalDate end = LocalDate.parse(request.getEndDate());
+
+        Course course = new Course(
+                request.getTitle(),
+                request.getDistance(),
+                request.getExpectedTime(),
+                request.getPathData(),
+                request.getDescription(),
+                start,  // ★ 변환된 날짜 객체를 넣습니다
+                end,    // ★ 변환된 날짜 객체를 넣습니다
+                group
+        );
+        courseRepository.save(course);
+    }
+
+    // 4. ★ [추가] 코스 상세 조회 (ID로 찾기)
+    @Transactional(readOnly = true)
+    public CourseDto.Response getCourseDetail(Long courseId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 코스가 존재하지 않습니다. id=" + courseId));
+
+        return new CourseDto.Response(
+                course.getId(),
+                course.getTitle(),
+                course.getDescription(),
+                course.getDistance(),
+                course.getExpectedTime(),
+                course.getPathData() // 상세 조회니까 경로 데이터 필수!
         );
     }
 }

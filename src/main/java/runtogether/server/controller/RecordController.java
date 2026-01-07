@@ -7,8 +7,6 @@ import org.springframework.web.bind.annotation.*;
 import runtogether.server.dto.RecordDto;
 import runtogether.server.service.RecordService;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/v1/records")
 @RequiredArgsConstructor
@@ -16,21 +14,21 @@ public class RecordController {
 
     private final RecordService recordService;
 
-    // 1. 기록 저장 API
+    // 1. 기록 저장 (프론트가 달리기 끝나면 호출)
+    // POST /api/v1/records
     @PostMapping
-    public ResponseEntity<String> createRecord(
-            @AuthenticationPrincipal String email, // ★ 수정됨
-            @RequestBody RecordDto.Request requestDto) {
-
-        recordService.createRecord(email, requestDto);
-        return ResponseEntity.ok("기록 저장이 완료되었습니다.");
+    public ResponseEntity<Long> createRecord(
+            @AuthenticationPrincipal String email,
+            @RequestBody RecordDto.Request request) {
+        return ResponseEntity.ok(recordService.createRecord(email, request));
     }
 
-    // 2. 내 기록 조회 API
-    @GetMapping("/my")
-    public ResponseEntity<List<RecordDto.Response>> getMyRecords(
-            @AuthenticationPrincipal String email) { // ★ 수정됨
-
-        return ResponseEntity.ok(recordService.getMyRecords(email));
+    // 2. 기록 상세 조회 (결과 페이지 볼 때 호출)
+    // GET /api/v1/records/{recordId}
+    @GetMapping("/{recordId}")
+    public ResponseEntity<RecordDto.DetailResponse> getRecordDetail(
+            @AuthenticationPrincipal String email,
+            @PathVariable Long recordId) {
+        return ResponseEntity.ok(recordService.getRecordDetail(email, recordId));
     }
 }
