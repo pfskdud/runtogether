@@ -33,12 +33,19 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                // 여기서 호출하는 메서드가 아래에 정의되어 있어야 합니다!
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
-                        // ★ 회원가입, 로그인만 허용 (프로필 설정은 검사!)
-                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/check-email").permitAll()
+                        // ★ [추가된 부분] 테스트 주소(/test/...)는 로그인 없이 허용!
+                        .requestMatchers("/test/**").permitAll()
+
+                        // ★ [추가] 코스 목록이나 랭킹도 로그인 없이 보려면 이것도 추가하세요 (선택)
+                        .requestMatchers("/api/v1/courses/**").permitAll()
+
+                        // 기존 허용 주소들 (회원가입, 로그인 등)
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+
+                        // 나머지는 다 로그인 필요
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

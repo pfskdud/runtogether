@@ -26,6 +26,10 @@ public class RunRecord extends BaseEntity {
     @JoinColumn(name = "course_id")
     private Course course;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "running_group_id")
+    private RunningGroup runningGroup;
+
     // [핵심 데이터]
     private String runTime;      // "56:42"
     private Double distance;     // 8.2 (km)
@@ -49,12 +53,16 @@ public class RunRecord extends BaseEntity {
     @OneToMany(mappedBy = "runRecord", cascade = CascadeType.ALL)
     private List<Lap> laps = new ArrayList<>();
 
+    @OneToMany(mappedBy = "runRecord")
+    private List<RoutePoint> routePoints = new ArrayList<>();
+
     // 생성자 (분석 결과 추가)
-    public RunRecord(User user, Course course, String runTime, Double distance,
+    public RunRecord(User user, Course course, RunningGroup runningGroup, String runTime, Double distance,
                      String averagePace, Integer calories, Integer heartRate,
                      String sectionJson, String routeData, String analysisResult, LocalDateTime endTime) {
         this.user = user;
         this.course = course;
+        this.runningGroup = runningGroup;
         this.runTime = runTime;
         this.distance = distance;
         this.averagePace = averagePace;

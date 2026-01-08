@@ -33,4 +33,6 @@ public interface RunRecordRepository extends JpaRepository<RunRecord, Long> {
             "WHERE r.course.id = :courseId AND l.lapKm = :km " +
             "ORDER BY l.lapTime ASC")
     List<Lap> findRankingBySection(@Param("courseId") Long courseId, @Param("km") int km);
+
+    List<RunRecord> findByRunningGroupId(Long runningGroupId);
 }
