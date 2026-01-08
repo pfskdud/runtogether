@@ -17,6 +17,7 @@ public class RecordDto {
     @AllArgsConstructor
     public static class Request {
         private Long courseId;       // 코스 ID
+        private Long groupId;
         private String runTime;      // "00:30:00"
         private Double distance;     // 8.2
         private String averagePace;  // "6'52\""
