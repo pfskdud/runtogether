@@ -4,9 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import runtogether.server.domain.Course;
-import runtogether.server.domain.CourseRepository;
+import runtogether.server.repository.CourseRepository;
 import runtogether.server.domain.RunningGroup;
-import runtogether.server.domain.RunningGroupRepository;
+import runtogether.server.repository.RunningGroupRepository;
 import runtogether.server.dto.CourseDto;
 import runtogether.server.dto.GroupDto;
 

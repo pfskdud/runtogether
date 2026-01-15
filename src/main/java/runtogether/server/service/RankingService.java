@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import runtogether.server.domain.Lap;
 import runtogether.server.domain.RunRecord;
-import runtogether.server.domain.RunRecordRepository;
+import runtogether.server.repository.RunRecordRepository;
 import runtogether.server.dto.RankingDto;
 
 import java.util.ArrayList;

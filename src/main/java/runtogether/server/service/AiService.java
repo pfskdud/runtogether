@@ -11,9 +11,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import runtogether.server.domain.RunRecord;
-import runtogether.server.domain.RunRecordRepository;
+import runtogether.server.repository.RunRecordRepository;
 import runtogether.server.domain.User;
-import runtogether.server.domain.UserRepository;
+import runtogether.server.repository.UserRepository;
 import runtogether.server.dto.CourseDto;
 
 import java.util.ArrayList;

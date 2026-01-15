@@ -1,6 +1,8 @@
-package runtogether.server.domain; // 패키지 위치에 맞게 수정
+package runtogether.server.repository; // 패키지 위치에 맞게 수정
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import runtogether.server.domain.RoutePoint;
+
 import java.util.List;
 
 public interface RoutePointRepository extends JpaRepository<RoutePoint, Long> {

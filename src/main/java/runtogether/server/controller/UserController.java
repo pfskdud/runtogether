@@ -53,4 +53,14 @@ public class UserController {
         String token = userService.login(requestDto);
         return ResponseEntity.ok(new TokenResponseDto(token));
     }
+
+    // ★ [추가] 마이페이지 정보 조회
+    // 요청 주소: GET /api/v1/auth/mypage
+    // 헤더: Authorization: Bearer {토큰}
+    @GetMapping("/mypage")
+    public ResponseEntity<MyPageDto> getMyPage(@AuthenticationPrincipal String email) {
+        // 토큰에 들어있는 email로 유저 정보를 찾아서 DTO로 만듦
+        MyPageDto myPageData = userService.getMyPageData(email);
+        return ResponseEntity.ok(myPageData);
+    }
 }

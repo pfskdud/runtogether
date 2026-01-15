@@ -36,6 +36,14 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
+
+                        // ▼▼▼ [여기 추가] 스웨거 접속 허용 (이게 핵심입니다!) ▼▼▼
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+
                         // ★ [추가된 부분] 테스트 주소(/test/...)는 로그인 없이 허용!
                         .requestMatchers("/test/**").permitAll()
 

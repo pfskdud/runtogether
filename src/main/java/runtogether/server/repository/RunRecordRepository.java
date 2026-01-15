@@ -1,13 +1,20 @@
-package runtogether.server.domain;
+package runtogether.server.repository;
 
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import runtogether.server.domain.Course;
 import runtogether.server.domain.Lap;
 import org.springframework.data.jpa.repository.JpaRepository;
+import runtogether.server.domain.RunRecord;
+import runtogether.server.domain.User;
+
 import java.util.List;
 import java.util.Optional;
 
 public interface RunRecordRepository extends JpaRepository<RunRecord, Long> {
+
+    Optional<RunRecord> findTopByUserOrderByEndTimeDesc(User user);
+
     // 특정 유저의 모든 기록을 가져오는 기능 (마이페이지용)
     List<RunRecord> findAllByUser(User user);
 

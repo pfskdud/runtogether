@@ -67,6 +67,21 @@ public class GroupController {
         }
     }
 
+    // ★ [추가] 초대 코드로 그룹 가입 (그룹 ID를 모를 때 사용)
+    // POST http://localhost:8080/api/v1/groups/join/code
+    @PostMapping("/join/code")
+    public ResponseEntity<?> joinByCode(
+            @AuthenticationPrincipal String email,
+            @RequestBody GroupDto.JoinRequest request) {
+        try {
+            // 위에서 만든 Service 함수 호출
+            Long groupId = groupService.joinGroupByAccessCode(email, request.getAccessCode());
+            return ResponseEntity.ok(Collections.singletonMap("message", "그룹 가입 성공! (GroupID: " + groupId + ")"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("message", e.getMessage()));
+        }
+    }
+
     // 4. ★ [수정됨] 그룹 목록 조회 (검색 + 필터링 통합)
     // 사용법: GET /api/v1/groups?keyword=한강&status=recruiting&type=public
     @GetMapping
