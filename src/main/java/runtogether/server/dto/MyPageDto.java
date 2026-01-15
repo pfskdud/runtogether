@@ -14,6 +14,8 @@ public class MyPageDto {
     private String nickname;      // 예: 열정열정
     private String userCode;      // 예: 2251 0295 1291 (화면에 보이는 ID)
     private String profileImage;  // 프로필 이미지 URL
+    private String gender;    // "MALE" or "FEMALE"
+    private String birthDate; // "1995-05-05"
 
     // 2. 최근 대회 영역 (없으면 null일 수도 있음)
     private String competitionTitle; // 예: 2025 숙명여대 마라톤

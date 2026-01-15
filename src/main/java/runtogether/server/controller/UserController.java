@@ -63,4 +63,14 @@ public class UserController {
         MyPageDto myPageData = userService.getMyPageData(email);
         return ResponseEntity.ok(myPageData);
     }
+
+    // ★ [추가] 회원 탈퇴 API
+    // 요청 주소: DELETE /api/v1/auth/withdraw
+    // 헤더: Authorization: Bearer {토큰}
+    @DeleteMapping("/withdraw")
+    public ResponseEntity<?> withdraw(@AuthenticationPrincipal String email) {
+        // 서비스에 이메일 넘겨서 삭제 요청
+        userService.withdrawUser(email);
+        return ResponseEntity.ok(Collections.singletonMap("message", "회원 탈퇴가 완료되었습니다."));
+    }
 }

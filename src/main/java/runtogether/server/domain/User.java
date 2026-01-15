@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDate;
+import java.util.*;
 
 @Entity
 @Getter
@@ -50,4 +51,21 @@ public class User {
         this.birthDate = birthDate;
         this.profileImageUrl = profileImageUrl;
     }
+
+    // ★★★ [회원 탈퇴 시 연관 데이터 자동 삭제 설정] ★★★
+
+    // 1. [방장] 내가 만든 대회들
+    // (RunningGroup 엔티티에 'private User owner;'가 있음)
+    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RunningGroup> ownedGroups = new ArrayList<>();
+
+    // 2. [참가자] 내가 참여 중인 내역
+    // (UserGroup 엔티티에 'private User user;'가 있음)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UserGroup> userGroups = new ArrayList<>();
+
+    // 3. [기록] 나의 러닝 기록들
+    // (RunRecord 엔티티에 'private User user;'가 있음)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RunRecord> runRecords = new ArrayList<>();
 }
