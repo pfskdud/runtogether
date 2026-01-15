@@ -104,48 +104,67 @@ public class UserService {
         return jwtUtil.generateToken(user.getEmail());
     }
 
-    // ★ [추가] 마이페이지 데이터 조회 로직
+    // ★ [수정] 마이페이지 데이터 조회 로직 (성별, 생년월일 추가)
+    @Transactional(readOnly = true) // 조회 전용 트랜잭션 걸어주면 좋습니다
     public MyPageDto getMyPageData(String email) {
-        // 1. 이메일로 유저 찾기 (없으면 에러)
+        // 1. 이메일로 유저 찾기
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
 
-        // 2. 유저 ID 포맷팅 (예: 그냥 숫자 문자열로 변환)
+        // 2. 유저 ID 포맷팅
         String userCode = String.valueOf(user.getId());
 
+        // 3. 기록 초기값 설정
         String title = "참여 기록 없음";
         String course = "-";
         String distance = "0.00 km";
         String time = "00:00:00";
         int calories = 0;
 
-        // 1. 가장 최신 기록 하나 조회
+        // 4. 가장 최신 기록 조회
         RunRecord lastRecord = runRecordRepository.findTopByUserOrderByEndTimeDesc(user)
-                .orElse(null); // 기록이 없으면 null
+                .orElse(null);
 
-        // 2. 기록이 있다면 데이터 덮어쓰기
+        // 5. 기록이 있다면 데이터 덮어쓰기
         if (lastRecord != null) {
-            // (주의: RunRecord -> Group -> Course 연결이 되어 있어야 함)
-            // 만약 엔티티 연결이 아직 안 되어 있다면 이 부분은 나중에 주석 해제하세요.
-            /* title = lastRecord.getGroup().getCourse().getTitle();
-            course = lastRecord.getGroup().getCourse().getCourseName();
+            // (주의: RunRecord -> Group -> Course 엔티티 연결 필요 시 주석 해제)
+            /* if (lastRecord.getGroup() != null && lastRecord.getGroup().getCourse() != null) {
+                title = lastRecord.getGroup().getCourse().getTitle();
+                course = lastRecord.getGroup().getCourse().getCourseName();
+            }
             */
 
-            // 기록 정보 (DB에 저장된 값)
-            distance = String.format("%.2f km", lastRecord.getDistance()); // 소수점 2자리 예쁘게
+            distance = String.format("%.2f km", lastRecord.getDistance());
             time = lastRecord.getRunTime();
             calories = lastRecord.getCalories();
         }
-        // 4. DTO에 담아서 리턴
+
+        // 6. DTO에 담아서 리턴 (★ 여기 두 줄 추가됨!)
         return MyPageDto.builder()
                 .nickname(user.getNickname())
                 .userCode(userCode)
                 .profileImage(user.getProfileImageUrl())
+
+                // ★ [추가] DB에 있는 성별과 생년월일을 DTO로 변환
+                // (Enum이면 .name(), LocalDate면 .toString() 사용)
+                .gender(user.getGender() != null ? user.getGender().name() : "MALE")
+                .birthDate(user.getBirthDate() != null ? user.getBirthDate().toString() : "2000-01-01")
+
                 .competitionTitle(title)
                 .courseName(course)
                 .totalDistance(distance)
                 .totalTime(time)
                 .totalCalories(calories)
                 .build();
+    }
+
+    // ★ [추가] 회원 탈퇴 로직
+    @Transactional
+    public void withdrawUser(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
+
+        // 유저 삭제 (연관된 기록이 있다면 User 엔티티의 Cascade 설정에 따라 같이 삭제됨)
+        userRepository.delete(user);
     }
 }

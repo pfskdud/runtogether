@@ -19,7 +19,7 @@ import java.util.Map;
 public class TmapService {
 
     private final String TMAP_URL = "https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1";
-    private final String APP_KEY = "<api입력>";
+    private final String APP_KEY = "Mp86xqHZXK2Dw8muG3jWz8PAm7AqwBL4olVDhkw6";
     public List<Map<String, Object>> getPedestrianPath(double startLat, double startLng, double endLat, double endLng) {
         RestTemplate restTemplate = new RestTemplate();
 
