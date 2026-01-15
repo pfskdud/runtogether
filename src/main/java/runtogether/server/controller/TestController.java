@@ -17,11 +17,14 @@ public class TestController {
     // 접속 주소: http://localhost:8080/test/path
     @GetMapping("/test/path")
     public List<Map<String, Object>> testPath() {
-        // 오목교역 8번출구 -> 투썸플레이스 좌표
-        double startLat = 37.524300;
-        double startLng = 126.873800;
-        double endLat = 37.520000;
-        double endLng = 126.875100;
+
+        // 출발: 마곡엠밸리 15단지
+        double startLat = 37.557266;
+        double startLng = 126.828154;
+
+        // 도착: 서울식물원
+        double endLat = 37.569413;
+        double endLng = 126.835025;
 
         return tmapService.getPedestrianPath(startLat, startLng, endLat, endLng);
     }

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import runtogether.server.domain.*;
 import runtogether.server.dto.GroupDto;
+import runtogether.server.repository.*;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -23,7 +24,6 @@ public class GroupService {
     private final RunRecordRepository runRecordRepository;
 
     // ★ [추가됨] Controller에서 사용하는 단순 조회 헬퍼 메소드
-    // 이게 없어서 방금 에러가 났던 겁니다!
     @Transactional(readOnly = true)
     public RunningGroup getGroup(Long groupId) {
         return groupRepository.findById(groupId)
@@ -114,6 +114,33 @@ public class GroupService {
 
         userGroupRepository.save(new UserGroup(user, group));
         return "그룹 가입 완료!";
+    }
+
+    // ★ [추가] 초대 코드만으로 그룹 찾아서 가입하기
+    @Transactional
+    public Long joinGroupByAccessCode(String email, String accessCode) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+
+        // 1. 코드로 그룹 찾기 (Repository에 이 기능이 있어야 함)
+        RunningGroup group = groupRepository.findByAccessCode(accessCode)
+                .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 입장 코드입니다."));
+
+        // 2. 이미 가입했는지 확인
+        if (userGroupRepository.existsByUserAndRunningGroup(user, group)) {
+            throw new IllegalArgumentException("이미 가입된 그룹입니다.");
+        }
+
+        // 3. 인원 제한 확인
+        int currentCount = userGroupRepository.countByRunningGroup(group);
+        if (group.getMaxPeople() != null && currentCount >= group.getMaxPeople()) {
+            throw new IllegalArgumentException("정원이 초과되어 가입할 수 없습니다.");
+        }
+
+        // 4. 가입 처리
+        userGroupRepository.save(new UserGroup(user, group));
+
+        return group.getId(); // 가입된 그룹 ID 반환
     }
 
     // 4. 그룹 목록 조회

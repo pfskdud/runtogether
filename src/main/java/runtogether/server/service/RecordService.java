@@ -9,6 +9,7 @@ import runtogether.server.domain.*;
 import runtogether.server.dto.LapDto;
 import runtogether.server.dto.RecordDto;
 import runtogether.server.dto.ReplayDto;
+import runtogether.server.repository.*;
 
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -171,8 +172,12 @@ public class RecordService {
             for (Map<String, Object> p : points) {
                 double lat = Double.parseDouble(String.valueOf(p.get("lat"))); // 안전한 형변환
                 double lng = Double.parseDouble(String.valueOf(p.get("lng")));
-                // time이나 elapsedSeconds 키값 확인 필요 (여기선 time으로 가정)
-                int time = Integer.parseInt(String.valueOf(p.get("time")));
+
+                // 값을 먼저 꺼내보고
+                Object timeObj = p.get("time");
+
+                // 값이 있으면 숫자로 바꾸고, 없으면(null이면) 0으로 퉁친다!
+                int time = (timeObj != null) ? Integer.parseInt(String.valueOf(timeObj)) : 0;
 
                 entities.add(new RoutePoint(record, lat, lng, time));
             }

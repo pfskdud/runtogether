@@ -1,5 +1,8 @@
-package runtogether.server.domain;
+package runtogether.server.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
+import runtogether.server.domain.RunningGroup;
+import runtogether.server.domain.User;
+import runtogether.server.domain.UserGroup;
 
 import java.util.List;
 

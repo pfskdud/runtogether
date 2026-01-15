@@ -6,8 +6,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import runtogether.server.domain.*;
 import runtogether.server.dto.LoginRequestDto;
+import runtogether.server.dto.MyPageDto;
 import runtogether.server.dto.ProfileDto;
 import runtogether.server.dto.SignUpDto;
+import runtogether.server.repository.RunRecordRepository;
+import runtogether.server.repository.UserRepository;
 import runtogether.server.util.JwtUtil;
 
 import java.util.UUID;
@@ -19,6 +22,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final RunRecordRepository runRecordRepository;
 
     // 1. 회원가입 (이메일, 비번만 저장)
     @Transactional
@@ -98,5 +102,50 @@ public class UserService {
         }
 
         return jwtUtil.generateToken(user.getEmail());
+    }
+
+    // ★ [추가] 마이페이지 데이터 조회 로직
+    public MyPageDto getMyPageData(String email) {
+        // 1. 이메일로 유저 찾기 (없으면 에러)
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
+
+        // 2. 유저 ID 포맷팅 (예: 그냥 숫자 문자열로 변환)
+        String userCode = String.valueOf(user.getId());
+
+        String title = "참여 기록 없음";
+        String course = "-";
+        String distance = "0.00 km";
+        String time = "00:00:00";
+        int calories = 0;
+
+        // 1. 가장 최신 기록 하나 조회
+        RunRecord lastRecord = runRecordRepository.findTopByUserOrderByEndTimeDesc(user)
+                .orElse(null); // 기록이 없으면 null
+
+        // 2. 기록이 있다면 데이터 덮어쓰기
+        if (lastRecord != null) {
+            // (주의: RunRecord -> Group -> Course 연결이 되어 있어야 함)
+            // 만약 엔티티 연결이 아직 안 되어 있다면 이 부분은 나중에 주석 해제하세요.
+            /* title = lastRecord.getGroup().getCourse().getTitle();
+            course = lastRecord.getGroup().getCourse().getCourseName();
+            */
+
+            // 기록 정보 (DB에 저장된 값)
+            distance = String.format("%.2f km", lastRecord.getDistance()); // 소수점 2자리 예쁘게
+            time = lastRecord.getRunTime();
+            calories = lastRecord.getCalories();
+        }
+        // 4. DTO에 담아서 리턴
+        return MyPageDto.builder()
+                .nickname(user.getNickname())
+                .userCode(userCode)
+                .profileImage(user.getProfileImageUrl())
+                .competitionTitle(title)
+                .courseName(course)
+                .totalDistance(distance)
+                .totalTime(time)
+                .totalCalories(calories)
+                .build();
     }
 }
