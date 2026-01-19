@@ -11,4 +11,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     // ★ [추가됨] 특정 그룹에 속한 코스들을 찾아오는 기능
     // SELECT * FROM courses WHERE group_id = ?
     List<Course> findByRunningGroup(RunningGroup runningGroup);
+
+    // ★ [추가] 특정 그룹의 모든 코스 삭제
+    void deleteByRunningGroup(RunningGroup runningGroup);
 }

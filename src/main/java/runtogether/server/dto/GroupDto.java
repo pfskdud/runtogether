@@ -42,6 +42,7 @@ public class GroupDto {
         private String tags;
         private Integer currentPeople; // ★ 여기를 currentPeople로 수정했습니다.
         private Long courseId;
+        private boolean isOwner;
     }
 
     // 3. 그룹 상세 조회 응답

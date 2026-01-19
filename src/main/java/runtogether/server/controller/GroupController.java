@@ -132,6 +132,19 @@ public class GroupController {
         }
     }
 
+    // ★★★ [추가 필수] 일반 참가자용 "대회 참가 취소(나가기)" ★★★
+    // DELETE /api/v1/groups/{groupId}/leave
+    @DeleteMapping("/{groupId}/leave")
+    public ResponseEntity<?> leaveGroup(
+            @AuthenticationPrincipal String email,
+            @PathVariable Long groupId) {
+
+        // 서비스에 leaveGroup 메서드가 있어야 함 (이전 답변 참고)
+        groupService.leaveGroup(email, groupId);
+
+        return ResponseEntity.ok(Collections.singletonMap("message", "대회 참가가 취소되었습니다."));
+    }
+
     // ★ [추가] 내 대회 목록 조회 API
     // GET http://localhost:8080/api/v1/groups/my
     @GetMapping("/my")
