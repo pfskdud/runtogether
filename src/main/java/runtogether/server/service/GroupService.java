@@ -170,7 +170,8 @@ public class GroupService {
                             group.getMaxPeople(),
                             group.getTags(),
                             currentCount,
-                            courseId
+                            courseId,
+                            false
                     );
                 })
                 .filter(dto -> {
@@ -224,17 +225,47 @@ public class GroupService {
         group.updateInfo(request.getGroupName(), request.getDescription());
     }
 
-    // 7. 그룹 삭제
+    // 7. 그룹 삭제 (수동 삭제 방식으로 변경)
     @Transactional
     public void deleteGroup(String email, Long groupId) {
+        // 1. 데이터 조회
         RunningGroup group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new IllegalArgumentException("그룹 없음"));
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 그룹입니다."));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
+
+        // 2. 방장 권한 체크 (로그 출력으로 원인 파악)
+        System.out.println("🔍 삭제 요청 - 내 ID: " + user.getId() + " / 방장 ID: " + group.getOwner().getId());
 
         if (!group.getOwner().getId().equals(user.getId())) {
-            throw new IllegalArgumentException("방장만 삭제할 수 있습니다.");
+            // 이 에러가 뜨는지 확인하기 위해 프론트엔드에서 로그를 볼 예정
+            throw new IllegalArgumentException("방장만 삭제할 수 있습니다. (권한 없음)");
         }
+
+        // 3. ★ [수정됨] 연관 데이터 안전 삭제 (순서 중요!)
+        try {
+            // (1) 이 그룹의 모든 코스를 가져온다.
+            List<Course> courses = courseRepository.findByRunningGroup(group);
+
+            // (2) 각 코스에 딸린 '기록(RunRecord)'을 먼저 다 지운다.
+            if (runRecordRepository != null) {
+                for (Course course : courses) {
+                    runRecordRepository.deleteByCourse(course); // 코스별 기록 삭제
+                }
+            }
+
+            // (3) 이제 기록이 없으므로 '코스'를 지운다.
+            courseRepository.deleteByRunningGroup(group);
+
+            // (4) 멤버 목록을 지운다.
+            userGroupRepository.deleteByRunningGroup(group);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new IllegalArgumentException("삭제 중 오류 발생: " + e.getMessage());
+        }
+
+        // 4. 마지막으로 그룹 본체 삭제
         groupRepository.delete(group);
     }
 
@@ -294,6 +325,8 @@ public class GroupService {
                     Long courseId = courseRepository.findByRunningGroup(group)
                             .stream().findFirst().map(Course::getId).orElse(null);
 
+                    boolean isOwner = group.getOwner().getId().equals(user.getId());
+
                     return new GroupDto.Response(
                             group.getId(),
                             group.getName(),
@@ -303,9 +336,33 @@ public class GroupService {
                             group.getMaxPeople(),
                             group.getTags(),
                             currentCount,
-                            courseId
+                            courseId,
+                            isOwner
                     );
                 })
                 .collect(Collectors.toList());
+    }
+
+    // 10. 그룹 탈퇴 (나가기) - 일반 참가자용
+    @Transactional
+    public void leaveGroup(String email, Long groupId) {
+        // 1. 유저 확인
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
+
+        // 2. 그룹 확인
+        RunningGroup group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 그룹입니다."));
+
+        // 3. 방장인지 확인 (방장은 '나가기' 불가, '삭제'만 가능)
+        if (group.getOwner().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("방장은 그룹을 나갈 수 없습니다. '그룹 삭제'를 이용해주세요.");
+        }
+
+        // 4. 가입 내역 확인 후 삭제
+        UserGroup userGroup = userGroupRepository.findByUserAndRunningGroup(user, group)
+                .orElseThrow(() -> new IllegalArgumentException("이 그룹에 가입되어 있지 않습니다."));
+
+        userGroupRepository.delete(userGroup);
     }
 }

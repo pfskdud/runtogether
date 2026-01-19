@@ -2,11 +2,8 @@ package runtogether.server.repository;
 
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import runtogether.server.domain.Course;
-import runtogether.server.domain.Lap;
+import runtogether.server.domain.*;
 import org.springframework.data.jpa.repository.JpaRepository;
-import runtogether.server.domain.RunRecord;
-import runtogether.server.domain.User;
 
 import java.util.List;
 import java.util.Optional;
@@ -42,4 +39,8 @@ public interface RunRecordRepository extends JpaRepository<RunRecord, Long> {
     List<Lap> findRankingBySection(@Param("courseId") Long courseId, @Param("km") int km);
 
     List<RunRecord> findByRunningGroupId(Long runningGroupId);
+
+    // ★ [추가] 특정 그룹의 모든 기록 삭제
+    void deleteByRunningGroup(RunningGroup runningGroup);
+    void deleteByCourse(Course course);
 }

@@ -3,8 +3,9 @@ package runtogether.server.domain;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import java.security.SecureRandom; // ★ 추가
-import java.time.LocalDate;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -28,13 +29,27 @@ public class RunningGroup {
     private boolean isSearchable;
     private String tags;
 
-    // 코드가 길어질 수 있으니 넉넉하게 저장
     @Column(unique = true)
     private String accessCode;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
     private User owner;
+
+    // ★★★ [핵심] 그룹 삭제 시 연관된 데이터 자동 삭제 설정 (Cascade) ★★★
+
+    // 1. 코스 (Course)
+    @OneToMany(mappedBy = "runningGroup", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Course> courses = new ArrayList<>();
+
+    // 2. 참가자 명단 (UserGroup)
+    @OneToMany(mappedBy = "runningGroup", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UserGroup> members = new ArrayList<>();
+
+    // 3. 러닝 기록 (RunRecord)
+    @OneToMany(mappedBy = "runningGroup", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RunRecord> records = new ArrayList<>();
+
 
     public RunningGroup(String name, String description,
                         boolean isSecret, boolean isSearchable, Integer maxPeople, String tags, User owner) {
@@ -51,13 +66,12 @@ public class RunningGroup {
         }
     }
 
-    // ★ [수정됨] 더 강력한 랜덤 코드 생성기 (10자리, A-Z + 0-9)
     private String generateRandomCode() {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         SecureRandom random = new SecureRandom();
         StringBuilder sb = new StringBuilder();
 
-        for (int i = 0; i < 10; i++) { // 10글자 생성
+        for (int i = 0; i < 10; i++) {
             int index = random.nextInt(chars.length());
             sb.append(chars.charAt(index));
         }
