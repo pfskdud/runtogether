@@ -1,76 +1,96 @@
 package runtogether.server.controller;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import runtogether.server.domain.User;
 import runtogether.server.dto.*;
+import runtogether.server.repository.UserRepository;
 import runtogether.server.service.UserService;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping("/api/v1") // ★ 수정: /auth를 떼고 공통 경로로 설정
 @RequiredArgsConstructor
 @Validated
 public class UserController {
 
     private final UserService userService;
+    private final UserRepository userRepository; // ★ [추가] 이게 없어서 에러 났었습니다!
 
-    // ★ [수정됨] 이메일 중복 확인 API (POST 방식)
-    // POST http://localhost:8080/api/v1/auth/check-email
-    // Body: { "email": "test@example.com" }
-    @PostMapping("/check-email")
+    // ===========================
+    //  1. 인증 (Auth) 관련 API
+    // ===========================
+
+    // 이메일 중복 확인
+    // URL: /api/v1/auth/check-email
+    @PostMapping("/auth/check-email")
     public ResponseEntity<?> checkEmailDuplicate(@RequestBody @Valid CheckEmailDto requestDto) {
-        // DTO에서 이메일 꺼내서 서비스로 전달
         userService.checkEmailDuplicate(requestDto.getEmail());
         return ResponseEntity.ok(Collections.singletonMap("message", "사용 가능한 이메일입니다."));
     }
 
-    @PostMapping("/register")
+    // 회원가입
+    // URL: /api/v1/auth/register
+    @PostMapping("/auth/register")
     public ResponseEntity<?> register(@Valid @RequestBody SignUpDto requestDto) {
-        // try-catch 삭제! 에러 나면 알아서 GlobalExceptionHandler로 넘어감
         String message = userService.registerUser(requestDto);
         return ResponseEntity.ok(Collections.singletonMap("message", message));
     }
 
-    // 2. 프로필 설정
-    @PostMapping("/profile")
-    public ResponseEntity<?> setupProfile(
-            @AuthenticationPrincipal String email, // ★ 수정: UserDetails -> String
-            @Valid @RequestBody ProfileDto requestDto) {
-
-        // ★ 수정: userDetails.getUsername() -> email 로 변경
-        userService.setupProfile(email, requestDto);
-        return ResponseEntity.ok(Collections.singletonMap("message", "프로필 설정 완료!"));
-    }
-
-    @PostMapping("/login")
+    // 로그인
+    // URL: /api/v1/auth/login
+    @PostMapping("/auth/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequestDto requestDto) {
         String token = userService.login(requestDto);
         return ResponseEntity.ok(new TokenResponseDto(token));
     }
 
-    // ★ [추가] 마이페이지 정보 조회
-    // 요청 주소: GET /api/v1/auth/mypage
-    // 헤더: Authorization: Bearer {토큰}
-    @GetMapping("/mypage")
+    // 프로필 설정
+    @PostMapping("/auth/profile")
+    public ResponseEntity<?> setupProfile(
+            @AuthenticationPrincipal String email,
+            @Valid @RequestBody ProfileDto requestDto) {
+        userService.setupProfile(email, requestDto);
+        return ResponseEntity.ok(Collections.singletonMap("message", "프로필 설정 완료!"));
+    }
+
+    // 마이페이지 조회
+    @GetMapping("/auth/mypage")
     public ResponseEntity<MyPageDto> getMyPage(@AuthenticationPrincipal String email) {
-        // 토큰에 들어있는 email로 유저 정보를 찾아서 DTO로 만듦
         MyPageDto myPageData = userService.getMyPageData(email);
         return ResponseEntity.ok(myPageData);
     }
 
-    // ★ [추가] 회원 탈퇴 API
-    // 요청 주소: DELETE /api/v1/auth/withdraw
-    // 헤더: Authorization: Bearer {토큰}
-    @DeleteMapping("/withdraw")
+    // 회원 탈퇴
+    @DeleteMapping("/auth/withdraw")
     public ResponseEntity<?> withdraw(@AuthenticationPrincipal String email) {
-        // 서비스에 이메일 넘겨서 삭제 요청
         userService.withdrawUser(email);
         return ResponseEntity.ok(Collections.singletonMap("message", "회원 탈퇴가 완료되었습니다."));
+    }
+
+    // ===========================
+    //  2. 유저 (Users) 관련 API
+    // ===========================
+
+    // ★ 내 정보(닉네임) 조회
+    // URL: /api/v1/users/info (이제 앱이 찾는 주소와 일치합니다!)
+    @GetMapping("/users/info")
+    public ResponseEntity<Map<String, Object>> getMyInfo(@AuthenticationPrincipal String email) {
+        // Service 안 거치고 바로 Repository 조회 (간단한 조회라 가능)
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("nickname", user.getNickname());
+        response.put("email", user.getEmail());
+
+        return ResponseEntity.ok(response);
     }
 }
