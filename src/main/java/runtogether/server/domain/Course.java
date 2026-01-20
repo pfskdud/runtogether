@@ -21,10 +21,9 @@ public class Course {
     @Column(nullable = false)
     private Double distance; // 거리 (km)
 
-    // ★ [추가] 예상 소요 시간 (분 단위)
-    private Integer expectedTime;
+    private Integer expectedTime;  // 예상 소요 시간 (분 단위)
 
-    // ★ [추가] 경로 데이터 (GPS 좌표들의 배열 JSON)
+    // 경로 데이터 (GPS 좌표들의 배열 JSON)
     // 내용이 길기 때문에 TEXT 타입으로 설정
     @Column(columnDefinition = "TEXT")
     private String pathData;
@@ -39,7 +38,7 @@ public class Course {
     @JoinColumn(name = "group_id")
     private RunningGroup runningGroup;
 
-    // 생성자 업데이트 (새로운 필드 포함)
+    // 생성자 업데이트
     public Course(String title, Double distance, Integer expectedTime, String pathData, String description, LocalDate startDate, LocalDate endDate, RunningGroup runningGroup) {
         this.title = title;
         this.distance = distance;
@@ -51,10 +50,17 @@ public class Course {
         this.runningGroup = runningGroup;
     }
 
-    // ★★★ [추가] 그룹 생성 시 코스 정보를 업데이트하는 메소드
+    // 그룹 생성 시 코스 정보를 업데이트하는 메소드
     public void updateGroupAndSchedule(RunningGroup group, LocalDate startDate, LocalDate endDate) {
         this.runningGroup = group;  // 이 코스의 주인을 그룹으로 설정
         this.startDate = startDate; // 시작일 변경
         this.endDate = endDate;     // 종료일 변경
+    }
+
+    // 그룹 삭제 시, 코스는 지우지 않고 연결만 끊기 위한 메소드
+    public void disconnectGroup() {
+        this.runningGroup = null; // 그룹과의 연결고리(FK)만 삭제
+        this.startDate = null;    // (선택사항) 일정 정보도 초기화하고 싶다면
+        this.endDate = null;
     }
 }

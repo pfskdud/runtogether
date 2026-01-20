@@ -1,5 +1,6 @@
 package runtogether.server.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -28,8 +29,7 @@ public class GroupDto {
         private String endDate;
     }
 
-    // 2. ★★★ [수정됨] 그룹 목록 응답 (Response)
-    // 변수명을 currentCount -> currentPeople로 변경하여 에러 해결!
+    // 2. 그룹 목록 응답 (Response)
     @Getter
     @AllArgsConstructor
     public static class Response {
@@ -40,7 +40,7 @@ public class GroupDto {
         private String ownerName;
         private Integer maxPeople;
         private String tags;
-        private Integer currentPeople; // ★ 여기를 currentPeople로 수정했습니다.
+        private Integer currentPeople;
         private Long courseId;
         private boolean isOwner;
     }
@@ -58,6 +58,14 @@ public class GroupDto {
         private String accessCode;
         private boolean isOwner;
         private Long courseId;
+
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd", timezone = "Asia/Seoul")
+        private LocalDate startDate;
+
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd", timezone = "Asia/Seoul")
+        private LocalDate endDate;
+
+        private long dDay;
     }
 
     // 4. 메인 화면 응답

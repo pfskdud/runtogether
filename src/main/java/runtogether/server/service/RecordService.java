@@ -23,7 +23,7 @@ public class RecordService {
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
     private final RunningGroupRepository runningGroupRepository;
-    private final RoutePointRepository routePointRepository; // ★ [추가] 좌표 저장을 위해 필요
+    private final RoutePointRepository routePointRepository;
 
     // 1. 기록 저장하기
     @Transactional
@@ -105,7 +105,7 @@ public class RecordService {
                 : "-";
 
         // 그룹 이름 null 처리
-        String groupName = (record.getRunningGroup() != null) ? record.getRunningGroup().getName() : "개인 러닝";
+        String groupName = (record.getRunningGroup() != null) ? record.getRunningGroup().getGroupName() : "개인 러닝";
 
         return new RecordDto.DetailResponse(
                 groupName,
