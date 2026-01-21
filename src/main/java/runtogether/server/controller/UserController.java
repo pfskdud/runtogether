@@ -1,5 +1,7 @@
 package runtogether.server.controller;
 
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -52,12 +54,22 @@ public class UserController {
         return ResponseEntity.ok(new TokenResponseDto(token));
     }
 
-    // 프로필 설정
-    @PostMapping("/auth/profile")
+    // ==========================================================
+    // ★ [수정됨] 프로필 설정 (JSON -> Multipart/form-data)
+    // ==========================================================
+    @PostMapping(value = "/auth/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> setupProfile(
             @AuthenticationPrincipal String email,
-            @Valid @RequestBody ProfileDto requestDto) {
-        userService.setupProfile(email, requestDto);
+
+            // 1. 사진 파일 받기 (변수명 "image"는 프론트와 맞춰야 함)
+            @RequestPart(value = "image", required = false) MultipartFile image,
+
+            // 2. 나머지 정보(닉네임 등) 받기 (JSON 대신 Form 데이터로 매핑)
+            @Valid @ModelAttribute ProfileDto requestDto
+    ) {
+        // 서비스로 이메일, DTO, 파일까지 다 넘김
+        userService.setupProfile(email, requestDto, image);
+
         return ResponseEntity.ok(Collections.singletonMap("message", "프로필 설정 완료!"));
     }
 
