@@ -18,6 +18,7 @@ public class RecordController {
 
     private final RecordService recordService;
 
+
     // 1. 기록 저장 (프론트가 달리기 끝나면 호출)
     // POST /api/v1/records
     @PostMapping
@@ -25,6 +26,20 @@ public class RecordController {
             @AuthenticationPrincipal String email,
             @RequestBody RecordDto.Request request) {
         return ResponseEntity.ok(recordService.createRecord(email, request));
+    }
+
+    // ★★★ [추가] 가장 최근 기록 조회 ("latest" 문자열 처리) ★★★
+    // 이 메서드가 /{recordId} 보다 먼저 있거나 명시되어야 에러가 안 납니다.
+    @GetMapping("/latest")
+    public ResponseEntity<RecordDto.DetailResponse> getLatestRecord(
+            @AuthenticationPrincipal String email) {
+        // 서비스에서 최근 기록 가져오기
+        RecordDto.DetailResponse response = recordService.getLatestRecord(email);
+
+        if (response == null) {
+            return ResponseEntity.noContent().build(); // 204 No Content (기록 없음)
+        }
+        return ResponseEntity.ok(response);
     }
 
     // 2. 기록 상세 조회 (결과 페이지 볼 때 호출)

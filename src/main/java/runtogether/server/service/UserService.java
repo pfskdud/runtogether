@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import runtogether.server.domain.*;
 import runtogether.server.dto.LoginRequestDto;
 import runtogether.server.dto.MyPageDto;
@@ -14,6 +15,7 @@ import runtogether.server.repository.UserRepository;
 import runtogether.server.util.JwtUtil;
 
 import java.util.UUID;
+import java.io.*;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +25,9 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final RunRecordRepository runRecordRepository;
+
+    // ★ 파일 저장 경로 (프로젝트 루트의 uploads 폴더)
+    private final String UPLOAD_DIR = System.getProperty("user.dir") + "/uploads/";
 
     // 1. 회원가입 (이메일, 비번만 저장)
     @Transactional
@@ -54,42 +59,66 @@ public class UserService {
         // 아무 에러가 안 나면 사용 가능한 이메일임!
     }
 
-    // 2. 프로필 설정
+    // 2. 프로필 설정 (★ MultipartFile image 매개변수 추가)
     @Transactional
-    public void setupProfile(String email, ProfileDto requestDto) {
+    public void setupProfile(String email, ProfileDto requestDto, MultipartFile image) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("유저 없음"));
 
-        // ★ 1. 닉네임 처리 로직 변경
-        // 일단 기존 닉네임(랜덤 닉네임)을 기본값으로 잡음
+        // [1] 닉네임 처리
         String nicknameToSave = user.getNickname();
-
-        // 만약 사용자가 새 닉네임을 입력했다면? (null도 아니고 빈칸도 아님)
         if (requestDto.getNickname() != null && !requestDto.getNickname().trim().isEmpty()) {
-            // 그리고 그게 기존 닉네임과 다르다면?
             if (!nicknameToSave.equals(requestDto.getNickname())) {
-                // 중복 검사 실행
                 if (userRepository.findByNickname(requestDto.getNickname()).isPresent()) {
                     throw new IllegalArgumentException("이미 사용 중인 닉네임입니다.");
                 }
-                // 통과하면 저장할 닉네임을 교체
                 nicknameToSave = requestDto.getNickname();
             }
         }
 
-        // ★ 2. 이미지 처리 (기존과 동일)
-        String finalImageUrl = requestDto.getProfileImageUrl();
+        // [2] 이미지 파일 처리 (★ 파일 업로드 로직 적용)
+        String finalImageUrl = user.getProfileImageUrl(); // 기본값은 기존 이미지
+
+        if (image != null && !image.isEmpty()) {
+            // 새 파일이 업로드된 경우 로컬에 저장하고 경로 반환
+            finalImageUrl = uploadFile(image);
+        } else if (requestDto.getProfileImageUrl() != null && !requestDto.getProfileImageUrl().isEmpty()) {
+            // 파일은 없지만 텍스트로 URL이 온 경우 (기존 방식 유지용)
+            finalImageUrl = requestDto.getProfileImageUrl();
+        }
+
         if (finalImageUrl == null || finalImageUrl.trim().isEmpty()) {
             finalImageUrl = "default.png";
         }
 
-        // ★ 3. 최종 업데이트 (nicknameToSave를 넣음)
+        // [3] 최종 업데이트
         user.updateProfile(
-                nicknameToSave, // 입력했으면 새거, 안 했으면 랜덤 닉네임
+                nicknameToSave,
                 requestDto.getGender(),
                 requestDto.getBirthDate(),
                 finalImageUrl
         );
+    }
+
+    // ★ [추가] 실제 파일을 서버 로컬에 저장하는 프라이빗 메서드
+    private String uploadFile(MultipartFile file) {
+        try {
+            File folder = new File(UPLOAD_DIR);
+            if (!folder.exists()) folder.mkdirs(); // 폴더 없으면 생성
+
+            String originalName = file.getOriginalFilename();
+            String extension = originalName != null ? originalName.substring(originalName.lastIndexOf(".")) : ".jpg";
+            String savedName = UUID.randomUUID().toString() + extension;
+
+            // 파일 저장
+            file.transferTo(new File(UPLOAD_DIR + savedName));
+
+            // 프론트에서 접근할 경로 리턴 (예: /uploads/uuid.jpg)
+            return "/uploads/" + savedName;
+
+        } catch (IOException e) {
+            throw new RuntimeException("프로필 사진 저장 실패", e);
+        }
     }
 
     // 3. 로그인 (기존과 동일)

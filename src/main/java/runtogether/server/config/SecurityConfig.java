@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -53,12 +54,21 @@ public class SecurityConfig {
                         // 기존 허용 주소들 (회원가입, 로그인 등)
                         .requestMatchers("/api/v1/auth/**").permitAll()
 
+                        // ★ 2. [추가] 업로드된 프로필 사진 경로 허용 (이게 빠져서 403 에러가 났습니다)
+                        .requestMatchers("/uploads/**").permitAll()
+
                         // 나머지는 다 로그인 필요
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public WebSecurityCustomizer webSecurityCustomizer() {
+        // 보안 필터 체인 자체를 타지 않게 하여 403 에러를 원천 차단합니다.
+        return (web) -> web.ignoring().requestMatchers("/uploads/**");
     }
 
     @Bean
