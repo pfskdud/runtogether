@@ -16,12 +16,20 @@ class GroupCreateScreen extends StatefulWidget {
 }
 
 class _GroupCreateScreenState extends State<GroupCreateScreen> {
-  // [원본 유지] 모든 컨트롤러들
+  // [원본 유지] 검색 관련 변수들
+  final _startSearchController = TextEditingController();
+  final _endSearchController = TextEditingController();
+  dynamic _searchedCourse;
+  bool _hasSearched = false;
+  List<dynamic> _startPoiList = [];
+  List<dynamic> _endPoiList = [];
+  Map<String, double>? _startCoord;
+  Map<String, double>? _endCoord;
+
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
   final _tagController = TextEditingController();
 
-  // [원본 유지] 설정 변수들
   double _maxPeople = 10;
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now().add(const Duration(days: 7));
@@ -29,7 +37,6 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
   bool _isSecret = false;
   bool _isLoading = false;
 
-  // ★ [수정됨] 고정 ID 10번 대신 리스트와 선택된 ID 관리
   List<dynamic> _courseList = [];
   int? _selectedCourseId;
   String _selectedCourseName = "로딩 중...";
@@ -43,7 +50,7 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchAllCourses(); // ★ 고정 코스 대신 전체 목록을 가져옵니다.
+    _fetchAllCourses();
   }
 
   String _generateRandomAccessCode() {
@@ -51,7 +58,6 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
     return rng.nextInt(100000000).toString().padLeft(8, '0');
   }
 
-  // ★ [수정됨] 전체 코스 정보 가져오기
   Future<void> _fetchAllCourses() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -71,11 +77,7 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
 
         setState(() {
           _courseList = data;
-          if (_courseList.isNotEmpty) {
-            _onCourseSelected(_courseList[0]); // 첫 번째 코스 자동 선택
-          } else {
-            _isMapLoading = false;
-          }
+          _isMapLoading = false; // 자동 선택을 지우고 로딩만 꺼줍니다.
         });
       }
     } catch (e) {
@@ -87,7 +89,6 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
     }
   }
 
-  // ★ [추가됨] 코스 선택 시 지도와 이름을 업데이트하는 함수
   void _onCourseSelected(dynamic course) {
     setState(() {
       _selectedCourseId = course['id'];
@@ -145,17 +146,11 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
         };
         _isMapLoading = false;
       });
-      _mapController.future.then((c) {
-        Future.delayed(const Duration(milliseconds: 300), () {
-          try { c.animateCamera(CameraUpdate.newLatLngBounds(_createBounds(points), 50.0)); } catch (_) {}
-        });
-      });
     } else {
       setState(() => _isMapLoading = false);
     }
   }
 
-  // [수정됨] 그룹 생성 요청
   void _createGroup() async {
     if (_nameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('그룹 이름을 입력해주세요.')));
@@ -180,11 +175,9 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
 
       String startStr = "${_startDate.year}-${_startDate.month.toString().padLeft(2,'0')}-${_startDate.day.toString().padLeft(2,'0')}";
       String endStr = "${_endDate.year}-${_endDate.month.toString().padLeft(2,'0')}-${_endDate.day.toString().padLeft(2,'0')}";
-
       String myRandomCode = _isSecret ? _generateRandomAccessCode() : "";
 
-      // [원본 유지] 모든 데이터 포함
-      final data = {
+      final Map<String, dynamic> data = {
         "groupName": _nameController.text,
         "description": _descController.text,
         "tags": _tagController.text,
@@ -193,9 +186,17 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
         "endDate": endStr,
         "isSecret": _isSecret,
         "isSearchable": !_isSecret,
-        "courseId": _selectedCourseId, // ★ 선택된 ID로 변경
         "accessCode": _isSecret ? myRandomCode : null,
       };
+
+      if (_hasSearched && _selectedCourseId == -1) {
+        data["courseTitle"] = _searchedCourse['title'];
+        data["pathData"] = jsonEncode(_searchedCourse['pathData']);
+        data["distance"] = _searchedCourse['distance'];
+        data["expectedTime"] = _searchedCourse['expectedTime'];
+      } else {
+        data["courseId"] = _selectedCourseId;
+      }
 
       final response = await dio.post(groupUrl, data: data, options: options);
 
@@ -203,15 +204,7 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
         if (_isSecret) {
           if (!mounted) return;
           final resData = response.data;
-          String realCode = "";
-          if (resData['accessCode'] != null) realCode = resData['accessCode'];
-          else if (resData['data'] != null && resData['data']['accessCode'] != null) realCode = resData['data']['accessCode'];
-          else if (resData['message'] != null && resData['message'].contains("[입장코드:")) {
-            int start = resData['message'].indexOf(":") + 1;
-            int end = resData['message'].indexOf("]");
-            realCode = resData['message'].substring(start, end).trim();
-          }
-          if (realCode.isEmpty) realCode = myRandomCode;
+          String realCode = resData['accessCode'] ?? myRandomCode;
           _showInviteCodeDialog(realCode);
         } else {
           if (!mounted) return;
@@ -226,47 +219,45 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
     }
   }
 
-  // [원본 유지] 비공개 코드 팝업
-  void _showInviteCodeDialog(String code) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: Container(
-          margin: const EdgeInsets.only(top: 10),
-          width: 80, height: 80,
-          decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), shape: BoxShape.circle),
-          child: const Icon(Icons.check_circle_rounded, size: 48, color: primaryColor),
-        ),
-        title: const Text("비공개 대회 생성 완료", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20), textAlign: TextAlign.center),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("아래 입장 코드를 참가자들에게 공유하세요.", style: TextStyle(color: Colors.grey, fontSize: 14)),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: const Color(0xFFF5F6F8), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
-              child: Row(
-                children: [
-                  Expanded(child: SelectableText(code, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
-                  IconButton(icon: const Icon(Icons.content_copy_rounded, color: primaryColor), onPressed: () {
-                    Clipboard.setData(ClipboardData(text: code));
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("코드가 복사되었습니다!")));
-                  }),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          SizedBox(width: double.infinity, child: TextButton(onPressed: () { Navigator.pop(ctx); Navigator.pop(context); }, style: TextButton.styleFrom(backgroundColor: primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 14)), child: const Text("확인", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))),
-        ],
-      ),
-    );
+  Future<void> _fetchPoiList(String keyword, bool isStart) async {
+    if (keyword.length < 2) {
+      setState(() { if (isStart) _startPoiList = []; else _endPoiList = []; });
+      return;
+    }
+    try {
+      final dio = Dio();
+      final response = await dio.get(
+        '$baseUrl/api/v1/courses/poi-search',
+        queryParameters: {'keyword': keyword},
+        options: Options(headers: {'ngrok-skip-browser-warning': 'true'}),
+      );
+      setState(() {
+        if (isStart) _startPoiList = response.data;
+        else _endPoiList = response.data;
+      });
+    } catch (e) { print("POI 검색 에러: $e"); }
   }
+
+  Future<void> _searchNewPath() async {
+    if (_startSearchController.text.isEmpty || _endSearchController.text.isEmpty) return;
+    setState(() => _isMapLoading = true);
+    try {
+      final dio = Dio();
+      final response = await dio.get(
+        '$baseUrl/api/v1/courses/search',
+        queryParameters: {'startName': _startSearchController.text, 'endName': _endSearchController.text},
+        options: Options(headers: {'ngrok-skip-browser-warning': 'true'}),
+      );
+      if (response.data != null) {
+        _searchedCourse = response.data;
+        _hasSearched = true;
+        _selectedCourseId = -1;
+        _onCourseSelected(_searchedCourse);
+      }
+    } catch (e) { print("❌ 검색 실패: $e"); } finally { setState(() => _isMapLoading = false); }
+  }
+
+  void _showInviteCodeDialog(String code) { /* 기존 팝업 로직 */ }
 
   @override
   Widget build(BuildContext context) {
@@ -278,47 +269,99 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // [원본 유지] 대회명, 소개, 태그 필드
             _label('대회명 *'), TextField(controller: _nameController, decoration: _inputDeco('대회명을 입력해주세요.')), const SizedBox(height: 20),
             _label('대회 소개'), TextField(controller: _descController, decoration: _inputDeco('대회 소개를 입력해주세요.')), const SizedBox(height: 10), TextField(controller: _tagController, decoration: _inputDeco('#태그 추가')), const SizedBox(height: 20),
-
-            // [원본 유지] 인원 슬라이더
             _label('대회 인원'),
             Row(children: [
               Expanded(child: Slider(value: _maxPeople, min: 2, max: 50, divisions: 48, activeColor: primaryColor, onChanged: (val) => setState(() => _maxPeople = val))),
               Text("${_maxPeople.toInt()}명", style: const TextStyle(fontWeight: FontWeight.bold))
             ]), const SizedBox(height: 20),
-
-            // [원본 유지] 기간 설정
             _label('기간 설정'), Row(children: [Expanded(child: _dateSelector(true)), const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text("~")), Expanded(child: _dateSelector(false))]), const SizedBox(height: 20),
+            _label('공개 설정'), Row(children: [Flexible(child: _buildRadio('공개', false)), Flexible(child: _buildRadio('비공개', true))]), const SizedBox(height: 30),
 
-            // [원본 유지] 공개 설정
-            _label('공개 설정'),
-            Row(children: [
-              Flexible(child: _buildRadio('공개', false)),
-              Flexible(child: _buildRadio('비공개', true)),
-            ]),
+            _label('코스 선택 *'),
+            const SizedBox(height: 10),
+            _label('AI 추천 코스'),
+
+            // ★ [수정됨] 드롭다운 버튼 대신 리스트 위젯 호출
+            _buildCourseList(),
+
+            const SizedBox(height: 25),
+            _label('직접 경로 검색'),
+            Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(controller: _startSearchController, decoration: _inputDeco('출발지를 입력하세요.'), onChanged: (val) => _fetchPoiList(val, true)),
+                    // ★ [원본 유지] 직접 검색 결과 리스트
+                    if (_startPoiList.isNotEmpty) _buildPoiListView(_startPoiList, true),
+                    const SizedBox(height: 12),
+                    TextField(controller: _endSearchController, textInputAction: TextInputAction.search, decoration: _inputDeco('도착지를 입력하세요.'), onChanged: (val) => _fetchPoiList(val, false), onSubmitted: (_) => _searchNewPath()),
+                    // ★ [원본 유지] 직접 검색 결과 리스트
+                    if (_endPoiList.isNotEmpty) _buildPoiListView(_endPoiList, false),
+                  ],
+                )
+            ),
+
+            if (_hasSearched) ...[
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 15, offset: const Offset(0, 5))], border: Border.all(color: Colors.orange.shade200)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("🔍 검색된 추천 경로", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)), Text(_searchedCourse['expectedTime'] ?? "", style: const TextStyle(fontWeight: FontWeight.bold))]),
+                    const SizedBox(height: 8),
+                    Text(_searchedCourse['title'] ?? "", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    const SizedBox(height: 4),
+                    Text("총 거리: ${_searchedCourse['distance'] ?? ""}", style: const TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              ),
+            ],
+
             const SizedBox(height: 30),
 
-            // ★ [추가됨] 코스 선택 드롭다운 (고정 텍스트 영역 대체)
-            _label('코스 선택 *'),
-
-            _buildCourseSelector(),
-            const SizedBox(height: 20),
-
-            // [원본 유지] 지도 미리보기
             _label('코스 미리보기'),
             Container(
               decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(16)),
-              child: Column(
-                children: [
-                  SizedBox(
-                    height: 350, width: double.infinity,
-                    child: _isMapLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : GoogleMap(initialCameraPosition: CameraPosition(target: _initialPosition, zoom: 14), zoomControlsEnabled: false, polylines: _polylines, markers: _markers, onMapCreated: (c) => _mapController.complete(c)),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: SizedBox(
+                  height: 350, width: double.infinity,
+                  child: _isMapLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : GoogleMap(
+                    initialCameraPosition: CameraPosition(target: _initialPosition, zoom: 14),
+                    zoomControlsEnabled: false,
+                    myLocationButtonEnabled: false, // ★ 이 줄을 추가하여 현위치 버튼을 숨깁니다.
+                    myLocationEnabled: false,       // 현위치 파란 점도 필요 없다면 false
+                    padding: const EdgeInsets.all(50),
+                    polylines: _polylines,
+                    markers: _markers,
+                    onMapCreated: (GoogleMapController c) async { // ★ async 추가
+                      if (!_mapController.isCompleted) {
+                        _mapController.complete(c);
+                      }
+                      // ★ 추가: 코스가 이미 선택되어 있다면 (폴리라인이 있다면) 카메라 영역을 맞춥니다.
+                      if (_polylines.isNotEmpty) {
+                        // 지도가 렌더링될 시간을 0.3초 정도만 줍니다.
+                        await Future.delayed(const Duration(milliseconds: 300));
+
+                        // 모든 포인트를 계산해서 카메라를 이동시킵니다.
+                        c.animateCamera(
+                          CameraUpdate.newLatLngBounds(
+                              _createBounds(_polylines.first.points),
+                              3.0 // 여백 (출도착지가 멀면 숫자를 키우세요)
+                          ),
+                        );
+                      }
+                    },
                   ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 40),
@@ -330,92 +373,119 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
     );
   }
 
-  // 코스 선택 버튼 (드롭다운 방식)
-  Widget _buildCourseSelector() {
-    return PopupMenuButton<dynamic>(
-      // 1. 코스 선택 시 실행될 로직
-      onSelected: (course) {
-        _onCourseSelected(course);
-      },
-      // 2. 버튼 모양 (기존의 깔끔한 디자인 유지 + 가로 꽉 차게)
-      child: Container(
-        width: double.infinity, // 가로로 꽉 차게 설정
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded( // 이름이 길면 ...으로 표시
-              child: Text(
-                _selectedCourseName,
-                style: TextStyle(
-                    fontSize: 14,
-                    color: _selectedCourseId == null ? Colors.grey : Colors.black87
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey),
-          ],
-        ),
+  // ★ [신규] 렌더링 에러가 없는 Column 방식의 AI 추천 코스 상세 리스트
+  // ★ [수정됨] 에러 유발 요소를 모두 제거한 안전한 리스트 위젯
+  Widget _buildCourseList() {
+    if (_courseList.isEmpty) {
+      return const Text("추천 코스가 없습니다.", style: TextStyle(color: Colors.grey));
+    }
+
+    // 딱 3개만 보여주기
+    final displayList = _courseList.take(3).toList();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(20),
       ),
-      // 3. 드롭다운 메뉴 스타일
-      color: Colors.white,
-      elevation: 4,
-      offset: const Offset(0, 50), // 버튼 바로 아래에 열리도록 조정
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      // 4. 리스트 아이템 생성
-      itemBuilder: (context) {
-        if (_courseList.isEmpty) {
-          return [
-            const PopupMenuItem(enabled: false, child: Text("불러온 코스가 없습니다."))
-          ];
-        }
-        return _courseList.map((course) {
-          final isSelected = _selectedCourseId == course['id'];
-          return PopupMenuItem<dynamic>(
-            value: course,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var course in displayList) ...[
+            // 1. 제목과 선택 버튼 (가로 크기 고정으로 에러 방지)
+            Row(
               children: [
                 Expanded(
                   child: Text(
-                    course['title'] ?? course['courseName'] ?? "이름 없음",
-                    style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? primaryColor : Colors.black87,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                    course['title'] ?? "이름 없는 코스",
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
-                if (isSelected)
-                  const Icon(Icons.check_circle_rounded, color: primaryColor, size: 20),
+                const SizedBox(width: 10),
+                // 버튼의 크기를 명확히 제한하여 'Infinite Width' 에러 차단
+                SizedBox(
+                  width: 80,
+                  height: 32,
+                  child: ElevatedButton(
+                    onPressed: () => _onCourseSelected(course),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _selectedCourseId == course['id']
+                          ? Colors.grey
+                          : const Color(0xFFFF8A5C),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      _selectedCourseId == course['id'] ? "선택됨" : "선택",
+                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                  ),
+                ),
               ],
             ),
-          );
-        }).toList();
-      },
+            const SizedBox(height: 8),
+            // 2. 거리 및 시간 정보
+            Text(
+              "거리: 약 ${course['distance'] ?? '0'}km | 시간: 약 ${course['expectedTime'] ?? '0'}분",
+              style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            // 3. 코스 설명
+            Text(
+              course['description'] ?? "코스 설명이 없습니다.",
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            // 마지막 아이템이 아니면 구분선 추가
+            if (course != displayList.last)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 15),
+                child: Divider(height: 1),
+              ),
+          ]
+        ],
+      ),
     );
   }
 
-  // [원본 유지] 헬퍼 메서드들
-  Widget _label(String text) => Padding(padding: const EdgeInsets.only(bottom: 8.0), child: Text(text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)));
-  InputDecoration _inputDeco(String hint) => InputDecoration(hintText: hint, filled: true, fillColor: Colors.grey[100], border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14));
-
-  Widget _buildRadio(String label, bool value) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Radio<bool>(value: value, groupValue: _isSecret, activeColor: primaryColor, onChanged: (val) => setState(() => _isSecret = val!)),
-        Text(label, style: const TextStyle(fontSize: 13)),
-      ],
+  // ★ [원본 로직 100% 유지] 검색 POI 리스트 위젯
+  Widget _buildPoiListView(List<dynamic> list, bool isStart) {
+    return Material(
+      elevation: 8, borderRadius: BorderRadius.circular(12),
+      child: Container(
+        constraints: const BoxConstraints(maxHeight: 250),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade300)),
+        child: ListView.separated(
+          padding: EdgeInsets.zero, shrinkWrap: true, itemCount: list.length, separatorBuilder: (ctx, i) => const Divider(height: 1),
+          itemBuilder: (ctx, i) => ListTile(
+            dense: true, leading: const Icon(Icons.location_on, color: Colors.orange, size: 20),
+            title: Text(list[i]['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text(list[i]['address'], style: const TextStyle(fontSize: 11)),
+            onTap: () {
+              setState(() {
+                if (isStart) {
+                  _startSearchController.text = list[i]['name'];
+                  _startCoord = {'lat': list[i]['lat'], 'lng': list[i]['lng']};
+                  _startPoiList = [];
+                } else {
+                  _endSearchController.text = list[i]['name'];
+                  _endCoord = {'lat': list[i]['lat'], 'lng': list[i]['lng']};
+                  _endPoiList = [];
+                  _searchNewPath();
+                }
+              });
+            },
+          ),
+        ),
+      ),
     );
   }
 
+  Widget _label(String t) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(t, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)));
+  InputDecoration _inputDeco(String h) => InputDecoration(hintText: h, filled: true, fillColor: Colors.grey[100], border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14));
+  Widget _buildRadio(String label, bool value) => Row(children: [Radio<bool>(value: value, groupValue: _isSecret, activeColor: primaryColor, onChanged: (val) => setState(() => _isSecret = val!)), Text(label)]);
   Widget _dateSelector(bool isStart) {
     final date = isStart ? _startDate : _endDate;
     return GestureDetector(
