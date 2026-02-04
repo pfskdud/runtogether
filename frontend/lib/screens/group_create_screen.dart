@@ -7,6 +7,8 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../constants.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 
 class GroupCreateScreen extends StatefulWidget {
   const GroupCreateScreen({super.key});
@@ -98,6 +100,25 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
 
     final pathData = course['pathData'] ?? course['path'] ?? course['route'];
     _drawRouteOnMap(pathData);
+
+    _mapController.future.then((c) {
+      Future.delayed(const Duration(milliseconds: 400), () {
+        // ★ 핵심: mounted가 true(위젯이 아직 화면에 있음)이고 폴리라인이 있을 때만 실행
+        if (mounted && _polylines.isNotEmpty) {
+          try {
+            c.animateCamera(
+              CameraUpdate.newLatLngBounds(
+                _createBounds(_polylines.first.points),
+                50.0,
+              ),
+            );
+          } catch (e) {
+            // 위젯이 이미 dispose 되었다면 catch에서 안전하게 무시합니다.
+            print("카메라 이동 무시: 위젯이 화면에서 사라짐");
+          }
+        }
+      });
+    });
   }
 
   LatLngBounds _createBounds(List<LatLng> positions) {
@@ -243,8 +264,13 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
     setState(() => _isMapLoading = true);
     try {
       final dio = Dio();
+
+      // ★ 자전거 경로 엔드포인트로 고정합니다.
+      // 백엔드에서 설정하신 정확한 주소로 확인해 주세요.
+      String searchUrl = '$baseUrl/api/v1/courses/search/bicycle';
+
       final response = await dio.get(
-        '$baseUrl/api/v1/courses/search',
+        searchUrl,
         queryParameters: {'startName': _startSearchController.text, 'endName': _endSearchController.text},
         options: Options(headers: {'ngrok-skip-browser-warning': 'true'}),
       );
@@ -254,7 +280,11 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
         _selectedCourseId = -1;
         _onCourseSelected(_searchedCourse);
       }
-    } catch (e) { print("❌ 검색 실패: $e"); } finally { setState(() => _isMapLoading = false); }
+    } catch (e) {
+      print("❌ 검색 실패: $e");
+    } finally {
+      setState(() => _isMapLoading = false);
+    }
   }
 
   void _showInviteCodeDialog(String code) { /* 기존 팝업 로직 */ }
@@ -283,7 +313,7 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
             const SizedBox(height: 10),
             _label('AI 추천 코스'),
 
-            // ★ [수정됨] 드롭다운 버튼 대신 리스트 위젯 호출
+            // ★ 리스트 위젯 호출
             _buildCourseList(),
 
             const SizedBox(height: 25),
@@ -298,9 +328,43 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
                     // ★ [원본 유지] 직접 검색 결과 리스트
                     if (_startPoiList.isNotEmpty) _buildPoiListView(_startPoiList, true),
                     const SizedBox(height: 12),
-                    TextField(controller: _endSearchController, textInputAction: TextInputAction.search, decoration: _inputDeco('도착지를 입력하세요.'), onChanged: (val) => _fetchPoiList(val, false), onSubmitted: (_) => _searchNewPath()),
-                    // ★ [원본 유지] 직접 검색 결과 리스트
+                    TextField(
+                        controller: _endSearchController,
+                        textInputAction: TextInputAction.search,
+                        decoration: _inputDeco('도착지를 입력하세요.'),
+                        onChanged: (val) => _fetchPoiList(val, false),
+                        //onSubmitted: (_) => _searchNewPath()
+                    ),
                     if (_endPoiList.isNotEmpty) _buildPoiListView(_endPoiList, false),
+
+                    const SizedBox(height: 16),
+
+                    const Row(
+                      children: [
+                        Icon(Icons.auto_awesome, color: Color(0xFF2A4B7C), size: 16),
+                        SizedBox(width: 6),
+                        Text(
+                          "횡단보도가 적은 러닝 최적 경로로 자동 탐색합니다.",
+                          style: TextStyle(fontSize: 11, color: Color(0xFF2A4B7C), fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: _searchNewPath, // 버튼 누르면 검색 함수 실행
+                        icon: const Icon(Icons.search, color: Colors.white),
+                        label: const Text("경로 검색하기", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
                   ],
                 )
             ),
@@ -309,15 +373,37 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 15, offset: const Offset(0, 5))], border: Border.all(color: Colors.orange.shade200)),
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 15,
+                          offset: const Offset(0, 5)
+                      )
+                    ],
+                    border: Border.all(color: primaryColor.withValues(alpha: 0.4))),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("🔍 검색된 추천 경로", style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)), Text(_searchedCourse['expectedTime'] ?? "", style: const TextStyle(fontWeight: FontWeight.bold))]),
+                    Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("🔍 검색된 추천 경로",
+                              style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+                          // ★ 시간 포맷 적용: 60분 넘으면 1시간 n분으로 표시
+                          Text(_formatTime(_searchedCourse['expectedTime']),
+                              style: const TextStyle(fontWeight: FontWeight.bold))
+                        ]
+                    ),
                     const SizedBox(height: 8),
-                    Text(_searchedCourse['title'] ?? "", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    Text(_searchedCourse['title'] ?? "",
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     const SizedBox(height: 4),
-                    Text("총 거리: ${_searchedCourse['distance'] ?? ""}", style: const TextStyle(color: Colors.grey)),
+                    // ★ 거리 포맷 적용: 소수점 2자리 유지 (예: 5.42km)
+                    Text("총 거리: ${_formatDistance(_searchedCourse['distance'])}km",
+                        style: const TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
@@ -336,10 +422,17 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
                       ? const Center(child: CircularProgressIndicator())
                       : GoogleMap(
                     initialCameraPosition: CameraPosition(target: _initialPosition, zoom: 14),
-                    zoomControlsEnabled: false,
+                    zoomControlsEnabled: true,      // ★ 우측 하단 +/- 버튼 표시 (선택 사항)
+                    scrollGesturesEnabled: true,    // ★ 한 손가락으로 지도 이동 가능
+                    zoomGesturesEnabled: true,      // ★ 두 손가락으로 확대/축소 가능
+                    rotateGesturesEnabled: true,    // ★ 두 손가락으로 지도 회전 가능
+                    tiltGesturesEnabled: true,      // ★ 두 손가락을 위아래로 밀어 각도 조절 가능
                     myLocationButtonEnabled: false, // ★ 이 줄을 추가하여 현위치 버튼을 숨깁니다.
                     myLocationEnabled: false,       // 현위치 파란 점도 필요 없다면 false
-                    padding: const EdgeInsets.all(50),
+                    gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                      Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+                    },
+                    padding: const EdgeInsets.all(20),
                     polylines: _polylines,
                     markers: _markers,
                     onMapCreated: (GoogleMapController c) async { // ★ async 추가
@@ -373,8 +466,7 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
     );
   }
 
-  // ★ [신규] 렌더링 에러가 없는 Column 방식의 AI 추천 코스 상세 리스트
-  // ★ [수정됨] 에러 유발 요소를 모두 제거한 안전한 리스트 위젯
+  // ★ AI 추천 코스 상세 리스트
   Widget _buildCourseList() {
     if (_courseList.isEmpty) {
       return const Text("추천 코스가 없습니다.", style: TextStyle(color: Colors.grey));
@@ -413,7 +505,7 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _selectedCourseId == course['id']
                           ? Colors.grey
-                          : const Color(0xFFFF8A5C),
+                          : primaryColor,
                       padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       elevation: 0,
@@ -429,7 +521,7 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
             const SizedBox(height: 8),
             // 2. 거리 및 시간 정보
             Text(
-              "거리: 약 ${course['distance'] ?? '0'}km | 시간: 약 ${course['expectedTime'] ?? '0'}분",
+              "거리: 약 ${_formatDistance(course['distance'])}km | 시간: 약 ${_formatTime(course['expectedTime'])}",
               style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 13),
             ),
             const SizedBox(height: 4),
@@ -499,5 +591,24 @@ class _GroupCreateScreenState extends State<GroupCreateScreen> {
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("${date.year}-${date.month}-${date.day}"), const Icon(Icons.calendar_today, size: 16, color: Colors.grey)]),
       ),
     );
+  }
+
+  // 시간(분)을 '1시간 10분' 또는 '10분'으로 변환
+  String _formatTime(dynamic minutes) {
+    if (minutes == null || minutes == 0) return "0분";
+    int mins = int.tryParse(minutes.toString()) ?? 0;
+    if (mins >= 60) {
+      int hour = mins ~/ 60;
+      int remainingMins = mins % 60;
+      return remainingMins > 0 ? "$hour시간 $remainingMins분" : "$hour시간";
+    }
+    return "$mins분";
+  }
+
+// 거리는 소수점 2자리까지 유지 (예: 5.42km)
+  String _formatDistance(dynamic distance) {
+    if (distance == null || distance == 0) return "0.00";
+    double dist = double.tryParse(distance.toString()) ?? 0.0;
+    return dist.toStringAsFixed(2); // 소수점 둘째자리까지 고정
   }
 }
